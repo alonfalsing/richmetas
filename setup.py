@@ -1,12 +1,12 @@
 from setuptools import setup
 
 setup(
-    name='fluence',
+    name='richmetas',
     version='0.0.1',
-    packages=['fluence'],
+    packages=['richmetas'],
     package_data={
-        'fluence': ['openapi.yaml'],
-        'fluence.contracts': ['abi/*'],
+        'richmetas': ['openapi.yaml'],
+        'richmetas.contracts': ['abi/*'],
     },
     install_requires=[
         'aiohttp',
@@ -25,10 +25,10 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'crawl = fluence.crawl:crawl',
-            'interpret = fluence.interpret:cli',
-            'serve = fluence.serve:serve',
-            'stark = fluence.stark_key:cli',
+            'crawl = richmetas.crawl:crawl',
+            'interpret = richmetas.interpret:cli',
+            'serve = richmetas.serve:serve',
+            'stark = richmetas.stark_key:cli',
         ],
     },
 )

@@ -8,7 +8,7 @@ from starkware.starknet.testing.contract import StarknetContract
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 
-CONTRACT_FILE = os.path.join(os.path.dirname(__file__), 'Fluence.cairo')
+CONTRACT_FILE = os.path.join(os.path.dirname(__file__), 'Richmetas.cairo')
 DEPOSIT_SELECTOR = 0xc73f681176fc7b3f9693986fd7b14581e8d540519e27400e88b8713932be01
 REGISTER_CONTRACT_SELECTOR = 0xe3f5e9e1456ffa52a3fbc7e8c296631d4cc2120c0be1e2829301c0d8fa026b
 L1_ACCOUNT_ADDRESS = 0xFe02793B075106bFC519d6EE667fAcBB11fBB373

@@ -41,7 +41,7 @@ class Forwarder:
         self._to_address = to_address
         self._contract = w3.eth.contract(
             contract_address,
-            abi=pkg_resources.resource_string(__name__, 'abi/FluenceForwarder.abi').decode())
+            abi=pkg_resources.resource_string(__name__, 'abi/RichmetasForwarder.abi').decode())
         self._domain = {
             'name': name,
             'version': version,

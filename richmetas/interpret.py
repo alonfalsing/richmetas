@@ -6,24 +6,22 @@ from urllib.parse import urljoin
 
 import aiohttp
 import click
-from jsonschema.exceptions import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput
 
-from fluence.contracts import ERC20, ERC721Metadata
-from fluence.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint
-from fluence.models.LimitOrder import Side
-from fluence.models.TokenContract import KIND_ERC721
-from fluence.models.Transaction import Transaction, TYPE_DEPLOY
-from fluence.services import async_session
-from fluence.utils import to_checksum_address, parse_int, ZERO_ADDRESS
+from richmetas.contracts import ERC20, ERC721Metadata
+from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint
+from richmetas.models.LimitOrder import Side
+from richmetas.models.TokenContract import KIND_ERC721
+from richmetas.models.Transaction import Transaction, TYPE_DEPLOY
+from richmetas.services import async_session
+from richmetas.utils import to_checksum_address, parse_int, ZERO_ADDRESS
 
 
-class FluenceInterpreter:
+class RichmetasInterpreter:
     def __init__(self, session: AsyncSession, client: aiohttp.ClientSession, w3: Web3):
         self.session = session
         self.client = client
@@ -268,7 +266,7 @@ async def interpret(address: str):
                 continue
 
             async with aiohttp.ClientSession() as client:
-                interpreter = FluenceInterpreter(session, client, Web3())
+                interpreter = RichmetasInterpreter(session, client, Web3())
                 for tx, in await session.execute(
                         select(Transaction).
                         where(Transaction.block == block).

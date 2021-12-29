@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 /**
  * @dev Simple minimal forwarder to be used together with an ERC2771 compatible contract. See {ERC2771Context}.
  */
-contract FluenceForwarder is EIP712 {
+contract RichmetasForwarder is EIP712 {
     using ECDSA for bytes32;
 
     struct ForwardRequest {
@@ -26,7 +26,7 @@ contract FluenceForwarder is EIP712 {
 
     mapping(address => mapping(uint256 => uint256)) private _nonces;
 
-    constructor() EIP712("FluenceForwarder", "0.1.0") {}
+    constructor() EIP712("RichmetasForwarder", "0.1.0") {}
 
     function getNonce(address from, uint256 batch) public view returns (uint256) {
         return _nonces[from][batch];
@@ -44,7 +44,7 @@ contract FluenceForwarder is EIP712 {
         payable
         returns (bool, bytes memory)
     {
-        require(verify(req, signature), "FluenceForwarder: signature does not match request");
+        require(verify(req, signature), "RichmetasForwarder: signature does not match request");
         _nonces[req.from][req.batch] = req.nonce + 1;
 
         (bool success, bytes memory returndata) = req.to.call{gas: req.gas, value: req.value}(

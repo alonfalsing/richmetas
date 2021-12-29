@@ -62,7 +62,7 @@ def tell(private_key):
 
 @cli.command('derive')
 @click.option('--layer', default='starknet')
-@click.option('--application', default='fluence')
+@click.option('--application', default='richmetas')
 @click.argument('private_key')
 @click.argument('seed', required=False)
 def derive_stark_key(layer, application, private_key, seed):

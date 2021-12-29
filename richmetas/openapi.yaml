@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Fluence
+  title: Richmetas
   version: 0.1.0
 servers:
   - url: '/v1'
@@ -8,7 +8,7 @@ servers:
 tags:
   - name: Overview
     description: |
-      The Fluence APIs are a bridge to a group of contracts deployed on Ethereum or Starknet.
+      The Richmetas APIs are a bridge to a group of contracts deployed on Ethereum or Starknet.
       The APIs mostly interact with Starknet, of which the requests should be authenticated
       with Starknet signatures when necessary. It takes 2 steps to sign a request:
 
@@ -168,8 +168,8 @@ paths:
   /contracts:
     get:
       operationId: get_contracts
-      summary: Get fluence contract addresses
-      description: Retrieves fluence and forwarder ethereum addresses.
+      summary: Get richmetas contract addresses
+      description: Retrieves richmetas and forwarder ethereum addresses.
       responses:
         '200':
           description: OK
@@ -178,11 +178,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  fluence:
+                  main:
                     type: string
                   forwarder:
                     type: string
-                required: [fluence, forwarder]
+                required: [main, forwarder]
 
   /clients:
     post:

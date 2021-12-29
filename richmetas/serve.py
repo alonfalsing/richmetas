@@ -24,9 +24,8 @@ from starkware.starknet.services.api.feeder_gateway.feeder_gateway_client import
 from starkware.starknet.services.api.gateway.gateway_client import GatewayClient
 from web3 import Web3
 
-from fluence.contracts.fluence import StarkFluence, LimitOrder, EtherFluence, ContractKind
-from fluence.contracts.forwarder import Forwarder, ReqSchema
-from fluence.utils import parse_int
+from richmetas.contracts import Forwarder, ReqSchema, StarkRichmetas, LimitOrder, EtherRichmetas, ContractKind
+from richmetas.utils import parse_int
 
 operations = OperationTableDef()
 
@@ -43,7 +42,7 @@ class Status(Enum):
 @operations.register
 async def get_contracts(request: Request):
     return web.json_response({
-        'fluence': request.config_dict['forwarder'].to_address,
+        'main': request.config_dict['forwarder'].to_address,
         'forwarder': request.config_dict['forwarder'].address,
     })
 
@@ -51,7 +50,7 @@ async def get_contracts(request: Request):
 @operations.register
 async def register_client(request: Request):
     with openapi_context(request) as context:
-        tx = await request.config_dict['fluence']. \
+        tx = await request.config_dict['richmetas']. \
             register_client(context.data['stark_key'],
                             context.data['address'],
                             context.data['nonce'],
@@ -63,7 +62,7 @@ async def register_client(request: Request):
 @operations.register
 async def get_client(request: Request):
     with openapi_context(request) as context:
-        stark_key = await request.config_dict['fluence']. \
+        stark_key = await request.config_dict['richmetas']. \
             get_client(context.parameters.path['address'])
         if stark_key == 0:
             return web.HTTPNotFound()
@@ -82,7 +81,7 @@ async def create_blueprint(request: Request):
             return web.HTTPUnauthorized()
 
         async with request.config_dict['async_session']() as session:
-            from fluence.models import Account, Blueprint, BlueprintSchema
+            from richmetas.models import Account, Blueprint, BlueprintSchema
 
             try:
                 account = (await session.execute(
@@ -113,7 +112,7 @@ async def find_collections(request: Request):
         owner = context.parameters.query.get('owner')
 
         async with request.config_dict['async_session']() as session:
-            from fluence.models import TokenContract, TokenContractSchema, Account, Blueprint
+            from richmetas.models import TokenContract, TokenContractSchema, Account, Blueprint
 
             def augment(stmt):
                 stmt = stmt.where(TokenContract.fungible == false())
@@ -145,7 +144,7 @@ async def find_collections(request: Request):
 async def register_collection(request: Request):
     with openapi_context(request) as context:
         async with request.config_dict['async_session']() as session:
-            from fluence.models import TokenContract, Account, Blueprint
+            from richmetas.models import TokenContract, Account, Blueprint
 
             if 'blueprint' in context.data:
                 blueprint = (await session.execute(
@@ -191,7 +190,7 @@ async def register_collection(request: Request):
             session.add(token_contract)
 
             req, signature = request.config_dict['forwarder'].forward(
-                *request.config_dict['ether_fluence'].register_contract(
+                *request.config_dict['ether_richmetas'].register_contract(
                     token_contract.address, ContractKind.ERC721, int(blueprint.minter.stark_key)))
             await session.commit()
 
@@ -205,7 +204,7 @@ async def register_collection(request: Request):
 async def get_metadata_by_permanent_id(request: Request):
     with openapi_context(request) as context:
         async with request.config_dict['async_session']() as session:
-            from fluence.models import Token, TokenContract, Blueprint
+            from richmetas.models import Token, TokenContract, Blueprint
 
             try:
                 token = (await session.execute(
@@ -226,7 +225,7 @@ async def get_metadata(request: Request):
         token_id = parse_int(context.parameters.path['token_id'])
         address = Web3.toChecksumAddress(context.parameters.path['address'])
         async with request.config_dict['async_session']() as session:
-            from fluence.models import TokenContract, Token
+            from richmetas.models import TokenContract, Token
 
             try:
                 token = (await session.execute(
@@ -246,7 +245,7 @@ async def update_metadata(request: Request):
         token_id = parse_int(request.match_info['token_id'])
         address = Web3.toChecksumAddress(context.parameters.path['address'])
         async with request.config_dict['async_session']() as session:
-            from fluence.models import TokenContract, Blueprint, Token, TokenSchema
+            from richmetas.models import TokenContract, Blueprint, Token, TokenSchema
 
             try:
                 token_contract = (await session.execute(
@@ -295,7 +294,7 @@ async def find_tokens(request: Request):
         collection = context.parameters.query.get('collection')
 
         async with request.config_dict['async_session']() as session:
-            from fluence.models import Token, TokenSchema, TokenContract, Account, Blueprint
+            from richmetas.models import Token, TokenSchema, TokenContract, Account, Blueprint
 
             def augment(stmt):
                 if owner:
@@ -328,7 +327,7 @@ async def find_tokens(request: Request):
 @operations.register
 async def get_balance(request: Request):
     with openapi_context(request) as context:
-        balance = await request.config_dict['fluence'].get_balance(
+        balance = await request.config_dict['richmetas'].get_balance(
             context.parameters.query['user'],
             context.parameters.query['contract'])
 
@@ -338,7 +337,7 @@ async def get_balance(request: Request):
 @operations.register
 async def get_owner(request: Request):
     with openapi_context(request) as context:
-        owner = await request.config_dict['fluence'].get_owner(
+        owner = await request.config_dict['richmetas'].get_owner(
             context.parameters.query['token_id'],
             context.parameters.query['contract'])
 
@@ -348,7 +347,7 @@ async def get_owner(request: Request):
 @operations.register
 async def mint(request: Request):
     with openapi_context(request) as context:
-        tx = await request.config_dict['fluence'].mint(
+        tx = await request.config_dict['richmetas'].mint(
             context.data['user'],
             context.data['token_id'],
             context.data['contract'],
@@ -361,7 +360,7 @@ async def mint(request: Request):
 @operations.register
 async def withdraw(request: Request):
     with openapi_context(request) as context:
-        tx = await request.config_dict['fluence'].withdraw(
+        tx = await request.config_dict['richmetas'].withdraw(
             context.data['user'],
             context.data['amount_or_token_id'],
             context.data['contract'],
@@ -375,7 +374,7 @@ async def withdraw(request: Request):
 @operations.register
 async def transfer(request: Request):
     with openapi_context(request) as context:
-        tx = await request.config_dict['fluence'].transfer(
+        tx = await request.config_dict['richmetas'].transfer(
             context.data['from'],
             context.data['to'],
             context.data['amount_or_token_id'],
@@ -397,7 +396,7 @@ async def find_orders(request: Request):
         state = context.parameters.query.get('state')
 
     async with request.config_dict['async_session']() as session:
-        from fluence.models import LimitOrder, LimitOrderSchema, Account, Token, TokenContract
+        from richmetas.models import LimitOrder, LimitOrderSchema, Account, Token, TokenContract
 
         def augment(stmt):
             if user:
@@ -435,7 +434,7 @@ async def find_orders(request: Request):
 @operations.register
 async def create_order(request: Request):
     with openapi_context(request) as context:
-        tx = await request.config_dict['fluence'].create_order(
+        tx = await request.config_dict['richmetas'].create_order(
             context.data['order_id'],
             LimitOrder(**context.data.discard('order_id'), state=0),
             context.parameters.query['signature'])
@@ -446,9 +445,9 @@ async def create_order(request: Request):
 @operations.register
 async def get_order(request: Request):
     with openapi_context(request) as context:
-        from fluence.contracts import LimitOrderSchema
+        from richmetas.contracts import LimitOrderSchema
 
-        limit_order = await request.config_dict['fluence'].get_order(context.parameters.path['id'])
+        limit_order = await request.config_dict['richmetas'].get_order(context.parameters.path['id'])
         if parse_int(limit_order.user) == 0:
             return web.HTTPNotFound()
 
@@ -458,7 +457,7 @@ async def get_order(request: Request):
 @operations.register
 async def fulfill_order(request: Request):
     with openapi_context(request) as context:
-        tx = await request.config_dict['fluence'].fulfill_order(
+        tx = await request.config_dict['richmetas'].fulfill_order(
             context.parameters.path['id'],
             context.data['user'],
             context.data['nonce'],
@@ -470,7 +469,7 @@ async def fulfill_order(request: Request):
 @operations.register
 async def cancel_order(request: Request):
     with openapi_context(request) as context:
-        tx = await request.config_dict['fluence'].cancel_order(
+        tx = await request.config_dict['richmetas'].cancel_order(
             context.parameters.path['id'],
             context.parameters.query['nonce'],
             context.parameters.query['signature'])
@@ -554,20 +553,20 @@ def serve(port: int):
 
     app = web.Application()
     w3 = Web3()
-    app['ether_fluence'] = EtherFluence(
-        config('STARK_FLUENCE_CONTRACT_ADDRESS', cast=parse_int), w3)
+    app['ether_richmetas'] = EtherRichmetas(
+        config('STARK_RICHMETAS_CONTRACT_ADDRESS', cast=parse_int), w3)
     app['forwarder'] = Forwarder(
-        'FluenceForwarder',
+        'RichmetasForwarder',
         '0.1.0',
         config('ETHER_FORWARDER_CONTRACT_ADDRESS'),
-        config('ETHER_FLUENCE_CONTRACT_ADDRESS'),
+        config('ETHER_RICHMETAS_CONTRACT_ADDRESS'),
         Account.from_key(config('ETHER_PRIVATE_KEY')),
         w3)
     app['feeder_gateway'] = FeederGatewayClient(
         url=config('FEEDER_GATEWAY_URL'),
         retry_config=RetryConfig(n_retries=1))
-    app['fluence'] = StarkFluence(
-        config('STARK_FLUENCE_CONTRACT_ADDRESS', cast=parse_int),
+    app['richmetas'] = StarkRichmetas(
+        config('STARK_RICHMETAS_CONTRACT_ADDRESS', cast=parse_int),
         app['feeder_gateway'],
         GatewayClient(
             url=config('GATEWAY_URL'),

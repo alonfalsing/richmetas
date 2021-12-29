@@ -10,9 +10,9 @@ from starkware.starknet.services.api.gateway.gateway_client import GatewayClient
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction
 from web3 import Web3
 
-from fluence import utils
-from fluence.models import State
-from fluence.utils import parse_int
+from richmetas import utils
+from richmetas.models import State
+from richmetas.utils import parse_int
 
 LimitOrder = namedtuple('LimitOrder', [
     'user',
@@ -39,11 +39,11 @@ class ContractKind(IntEnum):
     ERC721 = 2
 
 
-class EtherFluence:
+class EtherRichmetas:
     def __init__(self, stark_address: int, w3: Web3):
         self._stark_address = stark_address
         self._contract = w3.eth.contract(
-            abi=pkg_resources.resource_string(__name__, 'abi/Fluence.abi').decode())
+            abi=pkg_resources.resource_string(__name__, 'abi/Richmetas.abi').decode())
 
     def register_contract(
             self,
@@ -58,7 +58,7 @@ class EtherFluence:
         ]), 100000
 
 
-class StarkFluence:
+class StarkRichmetas:
     def __init__(self, stark_address: int, feeder: FeederGatewayClient, gateway: GatewayClient):
         self._address = stark_address
         self._feeder = feeder

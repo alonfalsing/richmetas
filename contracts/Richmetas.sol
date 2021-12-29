@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@imtbl/imx-contracts/contracts/IMintable.sol";
 import "./IStarknetCore.sol";
 
-contract Fluence is IERC721Receiver, ERC2771Context {
+contract Richmetas is IERC721Receiver, ERC2771Context {
     enum TokenType { Z, ERC20, ERC721 }
 
     uint256 constant WITHDRAW = 0;

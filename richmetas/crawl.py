@@ -9,7 +9,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import sessionmaker
 from starkware.starknet.services.api.feeder_gateway.feeder_gateway_client import FeederGatewayClient
 
-from fluence.models import Block, Transaction, StarkContract
+from richmetas.models import Block, Transaction, StarkContract
 
 
 class BlockCache:
@@ -147,7 +147,7 @@ class Crawler:
 @click.pass_context
 def crawl(ctx, thru):
     if not ctx.invoked_subcommand:
-        from fluence.services import async_session, feeder_client
+        from richmetas.services import async_session, feeder_client
 
         crawler = Crawler(feeder_client, async_session, 15)
         asyncio.run(crawler.run(thru))
@@ -156,7 +156,7 @@ def crawl(ctx, thru):
 @crawl.command()
 @click.option('--dry', is_flag=True)
 def purge(dry):
-    from fluence.services import async_session, feeder_client
+    from richmetas.services import async_session, feeder_client
 
     crawler = Crawler(feeder_client, async_session, 15)
     asyncio.run(crawler.purge(dry))
