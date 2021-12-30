@@ -44,6 +44,10 @@ func admin() -> (adm : felt):
 end
 
 @storage_var
+func pause() -> (paus : felt):
+end
+
+@storage_var
 func description(contract : felt) -> (desc : ContractDescription):
 end
 
@@ -82,6 +86,15 @@ func constructor{
         mint=0))
 
     return ()
+end
+
+@view
+func is_pause{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}() -> (
+    paus : felt):
+    return pause.read()
 end
 
 @view
@@ -147,6 +160,28 @@ func get_order{
     return order.read(id=id)
 end
 
+@external
+func set_pause{
+    syscall_ptr : felt*,
+    ecdsa_ptr : SignatureBuiltin*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    paus_ : felt,
+    nonce : felt):
+    alloc_locals
+    assert paus_ * (paus_ - 1) = 0
+
+    let (adm) = admin.read()
+    let inputs : felt* = alloc()
+    inputs[0] = paus_
+    inputs[1] = nonce
+    verify_inputs_by_signature(adm, 2, inputs)
+
+    pause.write(paus_)
+
+    return ()
+end
+
 @l1_handler
 func register_contract{
     syscall_ptr : felt*,
@@ -157,6 +192,7 @@ func register_contract{
     contract : felt,
     kind : felt,
     mint : felt):
+    check_on()
     assert (kind - KIND_ERC20) * (kind - KIND_ERC721) = 0
 
     let (l1_caddr) = l1_contract_address.read()
@@ -181,6 +217,8 @@ func register_client{
     user : felt,
     address : felt,
     nonce : felt):
+    check_on()
+
     let (usr) = client.read(address=address)
     assert usr = 0
 
@@ -204,6 +242,7 @@ func mint{
     token_id : felt,
     contract : felt,
     nonce : felt):
+    check_on()
     assert_nn(token_id)
 
     let (desc) = description.read(contract=contract)
@@ -237,6 +276,8 @@ func withdraw{
     address : felt,
     nonce : felt):
     alloc_locals
+
+    check_on()
     assert_nn(amount_or_token_id)
 
     let inputs : felt* = alloc()
@@ -325,6 +366,8 @@ func transfer{
     contract : felt,
     nonce : felt):
     alloc_locals
+
+    check_on()
     assert_nn(amount_or_token_id)
 
     let (desc) = description.read(contract=contract)
@@ -371,6 +414,7 @@ func create_order{
     quote_contract : felt,
     quote_amount : felt):
     alloc_locals
+    check_on()
 
     assert (bid - ASK) * (bid - BID) = 0
     assert_nn(quote_amount)
@@ -428,6 +472,7 @@ func fulfill_order{
     user : felt,
     nonce : felt):
     alloc_locals
+    check_on()
 
     let inputs : felt* = alloc()
     inputs[0] = id
@@ -481,6 +526,7 @@ func cancel_order{
     id : felt,
     nonce : felt):
     alloc_locals
+    check_on()
 
     let (local ord) = order.read(id)
     assert_not_zero(ord.user)
@@ -513,6 +559,16 @@ func cancel_order{
         quote_contract=ord.quote_contract,
         quote_amount=ord.quote_amount,
         state=STATE_CANCELLED))
+
+    return ()
+end
+
+func check_on{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}():
+    let (paus) = pause.read()
+    assert paus = 0
 
     return ()
 end

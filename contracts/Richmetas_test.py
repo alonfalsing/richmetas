@@ -83,12 +83,44 @@ async def create_order() -> (StarknetContract, Starknet):
     return contract, starknet
 
 
+async def set_pause(contract, pause: bool):
+    if pause:
+        await contract.set_pause(1, 1640845249). \
+            invoke(signature=[2152373199644994013537074989563110703984995626176401300263655574934100983398,
+                              1610383468856797454884961130039787198117325887855272351257830076364620547235])
+    else:
+        await contract.set_pause(0, 1640845327). \
+            invoke(signature=[906401387592879812240781095702260367522227900229362901441237177908449729004,
+                              1746203264330065778205729690386861836941625359907972470892212424882773617352])
+
+
+@pytest.mark.asyncio
+async def test_pause():
+    (contract, _) = await deploy()
+    exec_info = await contract.is_pause().call()
+    assert exec_info.result == (0,)
+    await set_pause(contract, True)
+    exec_info = await contract.is_pause().call()
+    assert exec_info.result == (1,)
+    await set_pause(contract, False)
+    exec_info = await contract.is_pause().call()
+    assert exec_info.result == (0,)
+
+
 @pytest.mark.asyncio
 async def test_register():
     (contract, starknet) = await deploy()
     await register_erc20(contract, starknet)
     exec_info = await contract.describe(ERC20_CONTRACT_ADDRESS).call()
     assert exec_info.result == (ContractDescription(1, 0),)
+
+
+@pytest.mark.asyncio
+async def test_pause_register():
+    (contract, starknet) = await deploy()
+    await set_pause(contract, True)
+    with pytest.raises(StarkException):
+        await register_erc20(contract, starknet)
 
 
 @pytest.mark.asyncio
@@ -122,6 +154,23 @@ async def test_withdraw():
 
 
 @pytest.mark.asyncio
+async def test_pause_withdraw():
+    (contract, starknet) = await deploy()
+    await register_erc20(contract, starknet)
+    await deposit_erc20(contract, starknet)
+    await set_pause(contract, True)
+    with pytest.raises(StarkException):
+        await contract. \
+            withdraw(user=STARK_KEY,
+                     amount_or_token_id=5050,
+                     contract=ERC20_CONTRACT_ADDRESS,
+                     address=L1_ACCOUNT_ADDRESS,
+                     nonce=338608066247168814322678008602989124260). \
+            invoke(signature=[2322320031199937621382164855179171324829388658558534430031773384874928285644,
+                              2070325902313014673871594772287523004539112227316507563051466754981777192045])
+
+
+@pytest.mark.asyncio
 async def test_mint():
     (contract, starknet) = await deploy()
     await register_erc721(contract, starknet)
@@ -130,6 +179,15 @@ async def test_mint():
     assert exec_info.result == (STARK_KEY,)
     exec_info = await contract.get_origin(2, ERC721_CONTRACT_ADDRESS).call()
     assert exec_info.result == (1,)
+
+
+@pytest.mark.asyncio
+async def test_pause_mint():
+    (contract, starknet) = await deploy()
+    await register_erc721(contract, starknet)
+    await set_pause(contract, True)
+    with pytest.raises(StarkException):
+        await mint(contract)
 
 
 @pytest.mark.asyncio
@@ -172,6 +230,23 @@ async def test_transfer():
     assert exec_info.result == (4500,)
     exec_info = await contract.get_balance(STARK_KEY2, ERC20_CONTRACT_ADDRESS).call()
     assert exec_info.result == (550,)
+
+
+@pytest.mark.asyncio
+async def test_pause_transfer():
+    (contract, starknet) = await deploy()
+    await register_erc20(contract, starknet)
+    await deposit_erc20(contract, starknet)
+    await set_pause(contract, True)
+    with pytest.raises(StarkException):
+        await contract. \
+            transfer(from_=STARK_KEY,
+                     to_=STARK_KEY2,
+                     amount_or_token_id=550,
+                     contract=ERC20_CONTRACT_ADDRESS,
+                     nonce=314449833170878049331847307766204685521). \
+            invoke(signature=[467262548791535994682896466084327736580627222684837650067132059832051326515,
+                              2582294054667657726949995064852086317426519424135885492175379122003100977749])
 
 
 @pytest.mark.asyncio
@@ -224,6 +299,26 @@ async def test_create_order():
 
 
 @pytest.mark.asyncio
+async def test_pause_create_order():
+    (contract, starknet) = await deploy()
+    await register_erc20(contract, starknet)
+    await register_erc721(contract, starknet)
+    await deposit_erc20(contract, starknet)
+    await set_pause(contract, True)
+    with pytest.raises(StarkException):
+        await contract. \
+            create_order(id=13,
+                         user=STARK_KEY,
+                         bid=1,
+                         base_contract=ERC721_CONTRACT_ADDRESS,
+                         base_token_id=1,
+                         quote_contract=ERC20_CONTRACT_ADDRESS,
+                         quote_amount=1000). \
+            invoke(signature=[2465446976930601613313290689566494744681330957706968178237697175223930491083,
+                              1006396189397407373593107424743909871951296920275078297313951054563784940343])
+
+
+@pytest.mark.asyncio
 async def test_create_order_signature_error():
     (contract, starknet) = await deploy()
     await register_erc20(contract, starknet)
@@ -264,6 +359,23 @@ async def test_fulfill_order():
 
 
 @pytest.mark.asyncio
+async def test_pause_fulfill_order():
+    (contract, starknet) = await create_order()
+    stark_key2 = private_to_stark_key(7654321)
+    await starknet.send_message_to_l2(
+        L1_CONTRACT_ADDRESS,
+        contract.contract_address,
+        DEPOSIT_SELECTOR,
+        [stark_key2, 1, ERC721_CONTRACT_ADDRESS, uuid4().int])
+    await set_pause(contract, True)
+    with pytest.raises(StarkException):
+        await contract. \
+            fulfill_order(id=13, user=stark_key2, nonce=272432959850731251252854066178611669564). \
+            invoke(signature=[321387143302878114952006499206549208486670715585015193735783076552567548299,
+                              3398326251082476600958583921386602733415015918027941476560645323118374856725])
+
+
+@pytest.mark.asyncio
 async def test_fulfill_order_signature_error():
     (contract, starknet) = await create_order()
     stark_key2 = private_to_stark_key(7654321)
@@ -297,6 +409,17 @@ async def test_cancel_order():
         state=2),)
     exec_info = await contract.get_balance(user=STARK_KEY, contract=ERC20_CONTRACT_ADDRESS).call()
     assert exec_info.result == (5050,)
+
+
+@pytest.mark.asyncio
+async def test_pause_cancel_order():
+    (contract, starknet) = await create_order()
+    await set_pause(contract, True)
+    with pytest.raises(StarkException):
+        await contract. \
+            cancel_order(id=13, nonce=158889073326537563656079938065157675041). \
+            invoke(signature=[2650767131421198863105211231598636999147167781552928706499636054741643869930,
+                              225496531335167625508834977728215331883459242940619785400861814095149514686])
 
 
 @pytest.mark.asyncio
