@@ -107,12 +107,16 @@ components:
     TokenVerbose:
       allOf:
         - $ref: '#/components/schemas/Token'
-        - type: object
-          properties:
-            owner:
-              $ref: '#/components/schemas/Account'
-            ask:
-              $ref: '#/components/schemas/LimitOrderCompact'
+        - anyOf:
+          - type: object
+            properties:
+              owner:
+                $ref: '#/components/schemas/Account'
+          - type: object
+            properties:
+              ask:
+                $ref: '#/components/schemas/LimitOrderCompact'
+          - type: object
 
     LimitOrderCompact:
       type: object
@@ -581,7 +585,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Token'
+                      $ref: '#/components/schemas/TokenVerbose'
                   total:
                     type: integer
                 required: [data, total]
@@ -609,7 +613,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Token'
+                $ref: '#/components/schemas/TokenVerbose'
         '404':
           description: The token is not found.
 

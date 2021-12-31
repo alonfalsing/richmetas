@@ -60,14 +60,19 @@ class RichmetasInterpreter:
                 options(selectinload(TokenContract.blueprint).
                         selectinload(Blueprint.minter)))).scalar_one()
             assert token_contract.fungible == (int(kind) != KIND_ERC721)
-            assert token_contract.blueprint.minter.stark_key == Decimal(mint)
+            if not token_contract.fungible:
+                assert token_contract.blueprint.minter.stark_key == Decimal(mint)
         except NoResultFound:
-            minter = await self.lift_account(mint)
-            blueprint = Blueprint(minter=minter)
-            self.session.add(blueprint)
+            fungible = int(kind) != KIND_ERC721
+            blueprint = None
+            if not fungible:
+                minter = await self.lift_account(mint)
+                blueprint = Blueprint(minter=minter)
+                self.session.add(blueprint)
+
             token_contract = TokenContract(
                 address=to_checksum_address(contract),
-                fungible=int(kind) != KIND_ERC721,
+                fungible=fungible,
                 blueprint=blueprint)
             self.session.add(self.lift_contract(token_contract))
 
