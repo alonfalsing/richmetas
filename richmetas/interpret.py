@@ -230,7 +230,12 @@ async def interpret(address: str):
             (await session.execute(
                 select(TokenContract).where(TokenContract.address == ZERO_ADDRESS))).one()
         except NoResultFound:
-            session.add(TokenContract(address=ZERO_ADDRESS, fungible=True))
+            session.add(TokenContract(
+                address=ZERO_ADDRESS,
+                fungible=True,
+                name='Ether',
+                symbol='ETH',
+                decimals=18))
             await session.commit()
 
     while True:

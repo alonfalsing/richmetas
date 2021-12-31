@@ -201,6 +201,26 @@ async def register_collection(request: Request):
 
 
 @operations.register
+async def get_collection(request: Request):
+    with openapi_context(request) as context:
+        address = Web3.toChecksumAddress(context.parameters.path.address)
+        async with request.config_dict['async_session']() as session:
+            from richmetas.models import TokenContract, TokenContractSchema, Blueprint
+
+            try:
+                token_contract = (await session.execute(
+                    select(TokenContract).
+                    where(TokenContract.address == address).
+                    options(
+                        selectinload(TokenContract.blueprint).
+                        selectinload(Blueprint.minter)))).scalar_one()
+
+                return web.json_response(TokenContractSchema().dump(token_contract))
+            except NoResultFound:
+                return web.HTTPNotFound()
+
+
+@operations.register
 async def get_metadata_by_permanent_id(request: Request):
     with openapi_context(request) as context:
         async with request.config_dict['async_session']() as session:
@@ -325,6 +345,30 @@ async def find_tokens(request: Request):
 
 
 @operations.register
+async def get_token(request: Request):
+    with openapi_context(request) as context:
+        token_id = parse_int(context.parameters.path['token_id'])
+        address = Web3.toChecksumAddress(context.parameters.path['address'])
+        async with request.config_dict['async_session']() as session:
+            from richmetas.models import Token, TokenSchema, TokenContract, Blueprint
+
+            try:
+                token = (await session.execute(
+                    select(Token).
+                    join(Token.contract).
+                    where(Token.token_id == token_id).
+                    where(TokenContract.address == address).
+                    options(
+                        selectinload(Token.contract).
+                        selectinload(TokenContract.blueprint).
+                        selectinload(Blueprint.minter)))).scalar_one()
+
+                return web.json_response(TokenSchema().dump(token))
+            except NoResultFound:
+                return web.HTTPNotFound()
+
+
+@operations.register
 async def get_balance(request: Request):
     with openapi_context(request) as context:
         balance = await request.config_dict['richmetas'].get_balance(
@@ -425,8 +469,11 @@ async def find_orders(request: Request):
                 (await session.execute(
                     query.options(
                         selectinload(LimitOrder.user),
-                        selectinload(LimitOrder.token).selectinload(Token.contract),
-                        selectinload(LimitOrder.quote_contract)))).scalars())),
+                        selectinload(LimitOrder.token).
+                        selectinload(Token.contract).
+                        selectinload(TokenContract.blueprint),
+                        selectinload(LimitOrder.quote_contract).
+                        selectinload(TokenContract.blueprint)))).scalars())),
             'total': (await session.execute(count)).scalar_one(),
         })
 

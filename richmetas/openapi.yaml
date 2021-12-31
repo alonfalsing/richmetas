@@ -54,6 +54,7 @@ components:
           type: string
           nullable: true
       required: [minter]
+      nullable: true
 
     Collection:
       type: object
@@ -113,7 +114,8 @@ components:
         quote_amount:
           type: string
         state:
-          type: integer
+          type: string
+          enum: [NEW, FULFILLED, CANCELLED]
       required: [order_id, user, bid, token, quote_contract, quote_amount, state]
 
     TransferRequest:
@@ -337,6 +339,7 @@ paths:
       parameters:
         - name: signature
           in: query
+          required: true
           description: |
             `sign([address, name, symbol, base_uri, image])`
           schema:
@@ -403,6 +406,28 @@ paths:
                   signature:
                     type: string
                 required: [req, signature]
+
+  /collections/{address}:
+    get:
+      operationId: get_collection
+      summary: Get collection
+      description: Get collection by (contract) address.
+      tags: [collection]
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+        '404':
+          description: The collection is not found.
 
   /_metadata/{permanent_id}/{token_id}:
     get:
@@ -537,6 +562,33 @@ paths:
                   total:
                     type: integer
                 required: [data, total]
+
+  /collections/{address}/tokens/{token_id}:
+    get:
+      operationId: get_token
+      summary: Get token
+      description: Get token by contract address and token ID.
+      tags: [token]
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '404':
+          description: The token is not found.
 
   /balance:
     get:
