@@ -53,11 +53,14 @@ class LimitOrder(Base):
         return State.CANCELLED
 
 
-class LimitOrderSchema(Schema):
+class LimitOrderCompactSchema(Schema):
     order_id = BigNumber()
-    user = fields.Nested(AccountSchema())
     bid = fields.Boolean()
-    token = fields.Nested(TokenSchema())
     quote_contract = fields.Nested(TokenContractSchema())
     quote_amount = BigNumber()
     state = fields.Function(lambda x: x.state.name)
+
+
+class LimitOrderSchema(LimitOrderCompactSchema):
+    user = fields.Nested(AccountSchema())
+    token = fields.Nested(TokenSchema())

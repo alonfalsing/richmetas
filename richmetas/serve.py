@@ -112,7 +112,7 @@ async def find_collections(request: Request):
         owner = context.parameters.query.get('owner')
 
         async with request.config_dict['async_session']() as session:
-            from richmetas.models import TokenContract, TokenContractSchema, Account, Blueprint
+            from richmetas.models import TokenContract, TokenContractVerboseSchema, Account, Blueprint
 
             def augment(stmt):
                 stmt = stmt.where(TokenContract.fungible == false())
@@ -131,7 +131,7 @@ async def find_collections(request: Request):
 
             return web.json_response({
                 'data': list(map(
-                    TokenContractSchema().dump,
+                    TokenContractVerboseSchema().dump,
                     (await session.execute(
                         query.options(
                             selectinload(TokenContract.blueprint).
@@ -205,7 +205,7 @@ async def get_collection(request: Request):
     with openapi_context(request) as context:
         address = Web3.toChecksumAddress(context.parameters.path.address)
         async with request.config_dict['async_session']() as session:
-            from richmetas.models import TokenContract, TokenContractSchema, Blueprint
+            from richmetas.models import TokenContract, TokenContractVerboseSchema, Blueprint
 
             try:
                 token_contract = (await session.execute(
@@ -215,7 +215,7 @@ async def get_collection(request: Request):
                         selectinload(TokenContract.blueprint).
                         selectinload(Blueprint.minter)))).scalar_one()
 
-                return web.json_response(TokenContractSchema().dump(token_contract))
+                return web.json_response(TokenContractVerboseSchema().dump(token_contract))
             except NoResultFound:
                 return web.HTTPNotFound()
 
@@ -314,7 +314,7 @@ async def find_tokens(request: Request):
         collection = context.parameters.query.get('collection')
 
         async with request.config_dict['async_session']() as session:
-            from richmetas.models import Token, TokenSchema, TokenContract, Account, Blueprint
+            from richmetas.models import Token, TokenVerboseSchema, TokenContract, Account, LimitOrder
 
             def augment(stmt):
                 if owner:
@@ -334,12 +334,14 @@ async def find_tokens(request: Request):
 
             return web.json_response({
                 'data': list(map(
-                    TokenSchema().dump,
+                    TokenVerboseSchema().dump,
                     (await session.execute(
                         query.options(
-                            selectinload(Token.contract).
-                            selectinload(TokenContract.blueprint).
-                            selectinload(Blueprint.minter)))).scalars())),
+                            selectinload(Token.contract),
+                            selectinload(Token.owner),
+                            selectinload(Token.ask).
+                            selectinload(LimitOrder.quote_contract)
+                        ))).scalars())),
                 'total': (await session.execute(count)).scalar_one(),
             })
 
@@ -350,7 +352,7 @@ async def get_token(request: Request):
         token_id = parse_int(context.parameters.path['token_id'])
         address = Web3.toChecksumAddress(context.parameters.path['address'])
         async with request.config_dict['async_session']() as session:
-            from richmetas.models import Token, TokenSchema, TokenContract, Blueprint
+            from richmetas.models import Token, TokenVerboseSchema, TokenContract, LimitOrder
 
             try:
                 token = (await session.execute(
@@ -359,11 +361,12 @@ async def get_token(request: Request):
                     where(Token.token_id == token_id).
                     where(TokenContract.address == address).
                     options(
-                        selectinload(Token.contract).
-                        selectinload(TokenContract.blueprint).
-                        selectinload(Blueprint.minter)))).scalar_one()
+                        selectinload(Token.contract),
+                        selectinload(Token.owner),
+                        selectinload(Token.ask).
+                        selectinload(LimitOrder.quote_contract)))).scalar_one()
 
-                return web.json_response(TokenSchema().dump(token))
+                return web.json_response(TokenVerboseSchema().dump(token))
             except NoResultFound:
                 return web.HTTPNotFound()
 

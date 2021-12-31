@@ -131,7 +131,9 @@ class RichmetasInterpreter:
             tx=tx)
         self.session.add(limit_order)
 
-        token.ask = limit_order
+        if not limit_order.bid:
+            assert token.owner == account
+            token.ask = limit_order
 
     async def fulfill_order(self, tx: Transaction):
         logging.warning(f'fulfill_order')
@@ -193,7 +195,8 @@ class RichmetasInterpreter:
             token, = (await self.session.execute(
                 select(Token).
                 where(Token.token_id == token_id).
-                where(Token.contract == token_contract))).one()
+                where(Token.contract == token_contract).
+                options(selectinload(Token.owner)))).one()
         except NoResultFound:
             token = Token(contract=token_contract, token_id=token_id, nonce=0)
             self.session.add(token)

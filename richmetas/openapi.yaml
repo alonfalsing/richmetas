@@ -63,8 +63,6 @@ components:
           type: string
         fungible:
           type: boolean
-        blueprint:
-          $ref: '#/components/schemas/Blueprint'
         name:
           type: string
         symbol:
@@ -75,6 +73,14 @@ components:
           type: string
           nullable: true
       required: [address, fungible, name, symbol, decimals]
+
+    CollectionVerbose:
+      allOf:
+        - $ref: '#/components/schemas/Collection'
+        - type: object
+          properties:
+            blueprint:
+              $ref: '#/components/schemas/Blueprint'
 
     Metadata:
       type: object
@@ -98,25 +104,42 @@ components:
               type: string
           required: [contract, token_id]
 
-    LimitOrder:
+    TokenVerbose:
+      allOf:
+        - $ref: '#/components/schemas/Token'
+        - type: object
+          properties:
+            owner:
+              $ref: '#/components/schemas/Account'
+            ask:
+              $ref: '#/components/schemas/LimitOrderCompact'
+
+    LimitOrderCompact:
       type: object
       properties:
         order_id:
           type: string
-        user:
-          $ref: '#/components/schemas/Account'
         bid:
           type: boolean
-        token:
-          $ref: '#/components/schemas/Token'
         quote_contract:
-          $ref: '#/components/schemas/Collection'
+          $ref: '#/components/schemas/CollectionVerbose'
         quote_amount:
           type: string
         state:
           type: string
           enum: [NEW, FULFILLED, CANCELLED]
-      required: [order_id, user, bid, token, quote_contract, quote_amount, state]
+      required: [order_id, bid, quote_contract, quote_amount, state]
+
+    LimitOrder:
+      allOf:
+        - $ref: '#/components/schemas/LimitOrderCompact'
+        - type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/Account'
+            token:
+              $ref: '#/components/schemas/Token'
+          required: [user, token]
 
     TransferRequest:
       type: object
@@ -325,7 +348,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Collection'
+                      $ref: '#/components/schemas/CollectionVerbose'
                   total:
                     type: integer
                 required: [data, total]
@@ -425,7 +448,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+                $ref: '#/components/schemas/CollectionVerbose'
         '404':
           description: The collection is not found.
 

@@ -5,7 +5,6 @@ from sqlalchemy.orm import relationship
 from web3 import Web3
 
 from .Base import Base
-from .Blueprint import BlueprintSchema
 
 KIND_ERC20 = 1
 KIND_ERC721 = 2
@@ -39,7 +38,6 @@ class TokenContract(Base):
 class TokenContractSchema(Schema):
     address = fields.String()
     fungible = fields.Boolean()
-    blueprint = fields.Nested(BlueprintSchema())
     name = fields.String()
     symbol = fields.String()
     decimals = fields.Integer()
