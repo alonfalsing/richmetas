@@ -3,6 +3,7 @@ from sqlalchemy import Column, Integer, Numeric, String, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 
 from .Base import Base
+from .BigNumber import BigNumber
 from .TokenContract import TokenContractSchema
 
 
@@ -30,7 +31,7 @@ class Token(Base):
 
 class TokenSchema(Schema):
     contract = fields.Nested(TokenContractSchema())
-    token_id = fields.String()
+    token_id = BigNumber()
     name = fields.String()
     description = fields.String()
     image = fields.String()

@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 from web3 import Web3
 
 from .Base import Base
+from .BigNumber import BigNumber
 
 
 class Account(Base):
@@ -26,5 +27,5 @@ class Account(Base):
 
 
 class AccountSchema(Schema):
-    stark_key = fields.String()
+    stark_key = BigNumber()
     address = fields.String()

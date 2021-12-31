@@ -137,7 +137,10 @@ class RichmetasInterpreter:
         logging.warning(f'fulfill_order')
         order_id, user, _nonce = tx.calldata
         limit_order, = (await self.session.execute(
-            select(LimitOrder).where(LimitOrder.order_id == Decimal(order_id)))).one()
+            select(LimitOrder).
+            where(LimitOrder.order_id == Decimal(order_id)).
+            options(selectinload(LimitOrder.token),
+                    selectinload(LimitOrder.user)))).one()
         limit_order.closed_tx = tx
         limit_order.fulfilled = True
 

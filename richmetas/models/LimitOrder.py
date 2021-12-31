@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship
 
 from .Account import AccountSchema
 from .Base import Base
+from .BigNumber import BigNumber
 from .Token import TokenSchema
 from .TokenContract import TokenContractSchema
 
@@ -53,10 +54,10 @@ class LimitOrder(Base):
 
 
 class LimitOrderSchema(Schema):
-    order_id = fields.String()
+    order_id = BigNumber()
     user = fields.Nested(AccountSchema())
     bid = fields.Boolean()
     token = fields.Nested(TokenSchema())
     quote_contract = fields.Nested(TokenContractSchema())
-    quote_amount = fields.String()
+    quote_amount = BigNumber()
     state = fields.Function(lambda x: x.state.name)

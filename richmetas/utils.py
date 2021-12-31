@@ -5,7 +5,7 @@ from web3 import Web3
 
 
 def parse_int(n: Union[int, str]):
-    return n if isinstance(n, int) else int(n, 0)
+    return int(n) if isinstance(n, int) else int(n, 0)
 
 
 def to_checksum_address(address) -> ChecksumAddress:
