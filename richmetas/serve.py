@@ -107,37 +107,39 @@ async def create_blueprint(request: Request):
 @operations.register
 async def find_collections(request: Request):
     with openapi_context(request) as context:
+        owner = context.parameters.query.get('owner')
+        fungible = context.parameters.query.get('fungible')
         page = context.parameters.query.get('page', 1)
         size = context.parameters.query.get('size', 100)
-        owner = context.parameters.query.get('owner')
 
-        async with request.config_dict['async_session']() as session:
-            from richmetas.models import TokenContract, TokenContractVerboseSchema, Account, Blueprint
+    async with request.config_dict['async_session']() as session:
+        from richmetas.models import TokenContract, TokenContractVerboseSchema, Account, Blueprint
 
-            def augment(stmt):
-                stmt = stmt.where(TokenContract.fungible == false())
-                if owner:
-                    stmt = stmt.join(TokenContract.blueprint). \
-                        join(Blueprint.minter). \
-                        where(Account.address == owner)
+        def augment(stmt):
+            if owner:
+                stmt = stmt.join(TokenContract.blueprint). \
+                    join(Blueprint.minter). \
+                    where(Account.address == owner)
+            stmt = stmt. \
+                where(TokenContract.fungible == (true() if fungible else false()))
 
-                return stmt
+            return stmt
 
-            query = augment(select(TokenContract)). \
-                order_by(desc(TokenContract.id)). \
-                limit(size). \
-                offset(size * (page - 1))
-            count = augment(select(functions.count()).select_from(TokenContract))
+        query = augment(select(TokenContract)). \
+            order_by(desc(TokenContract.id)). \
+            limit(size). \
+            offset(size * (page - 1))
+        count = augment(select(functions.count()).select_from(TokenContract))
 
-            return web.json_response({
-                'data': list(map(
-                    TokenContractVerboseSchema().dump,
-                    (await session.execute(
-                        query.options(
-                            selectinload(TokenContract.blueprint).
-                            selectinload(Blueprint.minter)))).scalars())),
-                'total': (await session.execute(count)).scalar_one(),
-            })
+        return web.json_response({
+            'data': list(map(
+                TokenContractVerboseSchema().dump,
+                (await session.execute(
+                    query.options(
+                        selectinload(TokenContract.blueprint).
+                        selectinload(Blueprint.minter)))).scalars())),
+            'total': (await session.execute(count)).scalar_one(),
+        })
 
 
 @operations.register
@@ -173,7 +175,9 @@ async def register_collection(request: Request):
                      context.data['name'].encode(),
                      context.data['symbol'].encode(),
                      context.data['base_uri'].encode(),
-                     context.data['image'].encode()],
+                     context.data['image'].encode(),
+                     context.data.get('background_image', '').encode(),
+                     context.data.get('description', '').encode()],
                     context.parameters.query['signature'],
                     int(blueprint.minter.stark_key)):
                 return web.HTTPUnauthorized()
@@ -186,7 +190,9 @@ async def register_collection(request: Request):
                 symbol=context.data['symbol'],
                 decimals=0,
                 base_uri=context.data['base_uri'],
-                image=context.data['image'])
+                image=context.data['image'],
+                background_image=context.data['background_image'],
+                description=context.data['description'])
             session.add(token_contract)
 
             req, signature = request.config_dict['forwarder'].forward(
@@ -308,42 +314,49 @@ async def update_metadata(request: Request):
 @operations.register
 async def find_tokens(request: Request):
     with openapi_context(request) as context:
-        page = context.parameters.query.get('page', 1)
-        size = context.parameters.query.get('size', 100)
+        q = context.parameters.query.get('q')
         owner = context.parameters.query.get('owner')
         collection = context.parameters.query.get('collection')
+        sort = context.parameters.query.get('sort')
+        asc = context.parameters.query.get('asc')
+        page = context.parameters.query.get('page', 1)
+        size = context.parameters.query.get('size', 100)
 
-        async with request.config_dict['async_session']() as session:
-            from richmetas.models import Token, TokenVerboseSchema, TokenContract, Account, LimitOrder
+    async with request.config_dict['async_session']() as session:
+        from richmetas.models import Token, TokenVerboseSchema, TokenContract, Account, LimitOrder
 
-            def augment(stmt):
-                if owner:
-                    stmt = stmt.join(Token.owner). \
-                        where(Account.address == owner)
-                if collection:
-                    stmt = stmt.join(Token.contract). \
-                        where(TokenContract.address == collection)
+        def augment(stmt):
+            if q:
+                stmt = stmt. \
+                    where(Token.name.ilike(f'%{q}%'))
+            if owner:
+                stmt = stmt.join(Token.owner). \
+                    where(Account.address == owner)
+            if collection:
+                stmt = stmt.join(Token.contract). \
+                    where(TokenContract.address == collection)
 
-                return stmt
+            return stmt
 
-            query = augment(select(Token)). \
-                order_by(desc(Token.id)). \
-                limit(size). \
-                offset(size * (page - 1))
-            count = augment(select(functions.count()).select_from(Token))
+        so = dict(token_id=Token.token_id, name=Token.name).get(sort, Token.id)
+        query = augment(select(Token)). \
+            order_by(so if asc else desc(so)). \
+            limit(size). \
+            offset(size * (page - 1))
+        count = augment(select(functions.count()).select_from(Token))
 
-            return web.json_response({
-                'data': list(map(
-                    TokenVerboseSchema().dump,
-                    (await session.execute(
-                        query.options(
-                            selectinload(Token.contract),
-                            selectinload(Token.owner),
-                            selectinload(Token.ask).
-                            selectinload(LimitOrder.quote_contract)
-                        ))).scalars())),
-                'total': (await session.execute(count)).scalar_one(),
-            })
+        return web.json_response({
+            'data': list(map(
+                TokenVerboseSchema().dump,
+                (await session.execute(
+                    query.options(
+                        selectinload(Token.contract),
+                        selectinload(Token.owner),
+                        selectinload(Token.ask).
+                        selectinload(LimitOrder.quote_contract)
+                    ))).scalars())),
+            'total': (await session.execute(count)).scalar_one(),
+        })
 
 
 @operations.register
@@ -435,17 +448,23 @@ async def transfer(request: Request):
 @operations.register
 async def find_orders(request: Request):
     with openapi_context(request) as context:
-        page = context.parameters.query.get('page', 1)
-        size = context.parameters.query.get('size', 100)
+        q = context.parameters.query.get('q')
         user = context.parameters.query.get('user')
         collection = context.parameters.query.get('collection')
         side = context.parameters.query.get('side')
         state = context.parameters.query.get('state')
+        sort = context.parameters.query.get('sort')
+        asc = context.parameters.query.get('asc')
+        page = context.parameters.query.get('page', 1)
+        size = context.parameters.query.get('size', 100)
 
     async with request.config_dict['async_session']() as session:
         from richmetas.models import LimitOrder, LimitOrderSchema, Account, Token, TokenContract
 
         def augment(stmt):
+            if q:
+                stmt = stmt.join(LimitOrder.token). \
+                    where(Token.name.ilike(f'%{q}%'))
             if user:
                 stmt = stmt.join(LimitOrder.user). \
                     where(Account.address == user)
@@ -460,8 +479,9 @@ async def find_orders(request: Request):
 
             return stmt
 
+        so = dict(price=LimitOrder.quote_amount).get(sort, LimitOrder.id)
         query = augment(select(LimitOrder)). \
-            order_by(desc(LimitOrder.id)). \
+            order_by(so if asc else desc(so)). \
             limit(size). \
             offset(size * (page - 1))
         count = augment(select(functions.count()).select_from(LimitOrder))

@@ -72,6 +72,12 @@ components:
         image:
           type: string
           nullable: true
+        background_image:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
       required: [address, fungible, name, symbol, decimals]
 
     CollectionVerbose:
@@ -228,7 +234,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -292,7 +300,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -333,6 +343,10 @@ paths:
           description: Ethereum address
           schema:
             type: string
+        - name: fungible
+          in: query
+          schema:
+            type: boolean
         - name: page
           in: query
           schema:
@@ -368,11 +382,13 @@ paths:
           in: query
           required: true
           description: |
-            `sign([address, name, symbol, base_uri, image])`
+            `sign([address, name, symbol, base_uri, image, background_image, description])`
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -391,6 +407,10 @@ paths:
                     base_uri:
                       type: string
                     image:
+                      type: string
+                    background_image:
+                      type: string
+                    description:
                       type: string
                   required: [address, name, symbol, base_uri, image]
                 - oneOf:
@@ -525,7 +545,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -556,6 +578,10 @@ paths:
       description: Find tokens by collection and/or owner.
       tags: [token]
       parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
         - name: owner
           in: query
           description: Ethereum address
@@ -566,6 +592,15 @@ paths:
           description: Contract address
           schema:
             type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [token_id, name]
+        - name: asc
+          in: query
+          schema:
+            type: boolean
         - name: page
           in: query
           schema:
@@ -689,7 +724,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -731,7 +768,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -774,7 +813,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -796,6 +837,10 @@ paths:
       description: Find orders by user and/or collection.
       tags: [order]
       parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
         - name: user
           in: query
           description: Stark key
@@ -818,6 +863,15 @@ paths:
           schema:
             type: integer
             enum: [0, 1, 2]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: ['price']
+        - name: asc
+          in: query
+          schema:
+            type: boolean
         - name: page
           in: query
           schema:
@@ -855,7 +909,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -918,7 +974,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       requestBody:
         content:
@@ -956,7 +1014,9 @@ paths:
           schema:
             type: array
             items:
-              type: string
+              type: integer
+            minItems: 2
+            maxItems: 2
           explode: false
       responses:
         '200':
