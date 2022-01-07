@@ -474,7 +474,7 @@ async def find_orders(request: Request):
                     where(TokenContract.address == collection)
             if side:
                 stmt = stmt.where(LimitOrder.bid == (side == 'bid'))
-            if state:
+            if state is not None:
                 stmt = stmt.where(LimitOrder.fulfilled == [null(), true(), false()][state])
 
             return stmt

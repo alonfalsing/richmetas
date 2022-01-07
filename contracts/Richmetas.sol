@@ -18,6 +18,7 @@ contract Richmetas is IERC721Receiver, ERC2771Context {
     uint256 constant REGISTER_CONTRACT = 0xe3f5e9e1456ffa52a3fbc7e8c296631d4cc2120c0be1e2829301c0d8fa026b;
 
     IStarknetCore starknetCore;
+    uint256 public trustedL2Contract;
     address admin;
     uint nonce;
 
@@ -26,6 +27,12 @@ contract Richmetas is IERC721Receiver, ERC2771Context {
     constructor(IStarknetCore starknetCore_, address trustedForwarder) ERC2771Context(trustedForwarder) {
         starknetCore = starknetCore_;
         admin = msg.sender;
+    }
+
+    function trust(uint256 fromContract) external {
+        require(admin == _msgSender(), "Unauthorized.");
+
+        trustedL2Contract = fromContract;
     }
 
     function registerContract(uint256 toContract, address tokenContract, TokenType tokenType, uint256 minter) external {
@@ -74,6 +81,8 @@ contract Richmetas is IERC721Receiver, ERC2771Context {
     }
 
     function withdraw(uint256 fromContract, address payable user, uint256 amountOrId, address toContract, bool mint, uint256 nonce_) external {
+        require(fromContract == trustedL2Contract, "Untrusted address.");
+
         TokenType typ_ = contracts[toContract];
         require(toContract == address(0) || typ_ != TokenType.Z, "Unregistered contract.");
 
