@@ -840,6 +840,9 @@ paths:
         '401':
           description: |
             The request is not correctly signed.
+        '409':
+          description: |
+            The request is rejected.
 
   /orders:
     get:

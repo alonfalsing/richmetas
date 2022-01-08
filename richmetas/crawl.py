@@ -3,17 +3,13 @@ import logging
 from datetime import datetime, timezone
 
 import click
-from decouple import config
 from services.external_api.base_client import BadRequest
 from sqlalchemy import delete, select
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import sessionmaker, selectinload
+from sqlalchemy.orm import sessionmaker
 from starkware.starknet.services.api.feeder_gateway.feeder_gateway_client import FeederGatewayClient
 
-from richmetas.contracts import StarkRichmetas
-from richmetas.models import Block, Transaction, StarkContract, Transfer
-from richmetas.services import TransferService
-from richmetas.utils import Status, parse_int
+from richmetas.models import Block, Transaction, StarkContract
 
 
 class BlockCache:
@@ -39,13 +35,7 @@ class BlockCache:
 
 
 class Crawler:
-    def __init__(
-            self,
-            richmetas: StarkRichmetas,
-            feeder_gateway: FeederGatewayClient,
-            async_session: sessionmaker,
-            cooldown: float):
-        self._richmetas = richmetas
+    def __init__(self, feeder_gateway: FeederGatewayClient, async_session: sessionmaker, cooldown: float):
         self._feeder_gateway = feeder_gateway
         self._async_session = async_session
         self._block_cache = BlockCache(async_session)
@@ -63,7 +53,6 @@ class Crawler:
                     await self._crawl(j)
                     j += 1
 
-                    await self._transfer()
                     continue
                 except BadRequest:
                     cd = loop.time() + self._cooldown
@@ -152,42 +141,11 @@ class Crawler:
 
             await session.commit()
 
-    async def _transfer(self):
-        async with self._async_session() as session:
-            for transfer in (await session.execute(
-                    select(Transfer).where(Transfer.status == Status.NOT_RECEIVED.value).limit(20).options(
-                        selectinload(Transfer.from_account),
-                        selectinload(Transfer.to_account),
-                        selectinload(Transfer.contract)))).scalars():
-                status = await self._feeder_gateway.get_transaction_status(tx_hash=transfer.hash)
-                if status['tx_status'] == Status.NOT_RECEIVED.value:
-                    logging.warning(f'transfer(hash={transfer.hash})')
-                    await self._richmetas.transfer(
-                        int(transfer.from_account.stark_key),
-                        int(transfer.to_account.stark_key),
-                        int(transfer.amount),
-                        transfer.contract.address,
-                        int(transfer.nonce),
-                        [int(transfer.signature_r), int(transfer.signature_s)])
-                elif status['tx_status'] == Status.REJECTED.value:
-                    logging.warning(f'reject(hash={transfer.hash})')
-                    await TransferService(session).reject(transfer)
-                else:
-                    logging.warning(f'update(hash={transfer.hash}, status={status})')
-                    transfer.status = status
-
-            await session.commit()
-
 
 def build():
-    from richmetas.globals import async_session, feeder_gateway_client, gateway_client
+    from richmetas.globals import async_session, feeder_gateway_client
 
-    richmetas = StarkRichmetas(
-        config('STARK_RICHMETAS_CONTRACT_ADDRESS', cast=parse_int),
-        feeder_gateway_client,
-        gateway_client)
-
-    return Crawler(richmetas, feeder_gateway_client, async_session, 15)
+    return Crawler(feeder_gateway_client, async_session, 15)
 
 
 @click.group(invoke_without_command=True)

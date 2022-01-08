@@ -449,7 +449,8 @@ async def transfer(request: Request):
         with openapi_context(request) as context:
             try:
                 token_contract = (await session.execute(
-                    select(TokenContract).where(TokenContract.address == context.data['contract']))).scalar_one()
+                    select(TokenContract).
+                    where(TokenContract.address == utils.to_checksum_address(context.data['contract'])))).scalar_one()
             except NoResultFound:
                 return web.HTTPBadRequest()
 
@@ -481,7 +482,11 @@ async def transfer(request: Request):
             return web.HTTPUnauthorized()
 
         hash_ = '0x%x' % tx.calculate_hash(request.config_dict['starknet_general_config'])
-        if not (await session.execute(select(Transfer).where(Transfer.hash == hash_))).one_or_none():
+        tr = (await session.execute(select(Transfer).where(Transfer.hash == hash_))).scalar_one_or_none()
+        if tr:
+            if tr.status == Status.REJECTED.value:
+                return web.HTTPConflict()
+        else:
             await TransferService(session).transfer(
                 hash_, tx.calldata[0], tx.calldata[1], tx.calldata[2], token_contract, tx.calldata[4], tx.signature)
             await session.commit()

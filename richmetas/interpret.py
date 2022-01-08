@@ -6,20 +6,21 @@ from urllib.parse import urljoin
 
 import aiohttp
 import click
+from decouple import config
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from web3 import Web3
 
-from richmetas.contracts import ERC20, ERC721Metadata
+from richmetas.contracts import ERC20, ERC721Metadata, StarkRichmetas
 from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint, Transfer
 from richmetas.models.LimitOrder import Side
 from richmetas.models.TokenContract import KIND_ERC721
 from richmetas.models.Transaction import Transaction, TYPE_DEPLOY
-from richmetas.globals import async_session
+from richmetas.globals import async_session, feeder_gateway_client, gateway_client
 from richmetas.services import TransferService
-from richmetas.utils import to_checksum_address, parse_int, ZERO_ADDRESS
+from richmetas.utils import to_checksum_address, parse_int, ZERO_ADDRESS, Status
 
 
 class RichmetasInterpreter:
@@ -286,6 +287,11 @@ class RichmetasInterpreter:
 
 
 async def interpret(address: str):
+    richmetas = StarkRichmetas(
+        config('STARK_RICHMETAS_CONTRACT_ADDRESS', cast=parse_int),
+        feeder_gateway_client,
+        gateway_client)
+
     async with async_session() as session:
         try:
             (await session.execute(
@@ -342,6 +348,31 @@ async def interpret(address: str):
                     await interpreter.exec(tx)
 
             contract.block_counter += 1
+            for transfer in (await session.execute(
+                    select(Transfer).
+                    where(Transfer.status.in_([Status.NOT_RECEIVED.value, Status.RECEIVED.value])).
+                    limit(20).
+                    options(
+                        selectinload(Transfer.from_account),
+                        selectinload(Transfer.to_account),
+                        selectinload(Transfer.contract)))).scalars():
+                status = (await feeder_gateway_client.get_transaction_status(tx_hash=transfer.hash))['tx_status']
+                if status == Status.NOT_RECEIVED.value:
+                    logging.warning(f'transfer(hash={transfer.hash})')
+                    await richmetas.transfer(
+                        int(transfer.from_account.stark_key),
+                        int(transfer.to_account.stark_key),
+                        int(transfer.amount),
+                        transfer.contract.address,
+                        int(transfer.nonce),
+                        [int(transfer.signature_r), int(transfer.signature_s)])
+                elif status == Status.REJECTED.value:
+                    logging.warning(f'reject(hash={transfer.hash})')
+                    await TransferService(session).reject(transfer)
+                else:
+                    logging.warning(f'update(hash={transfer.hash}, status={status})')
+                    transfer.status = status
+
             await session.commit()
 
 
