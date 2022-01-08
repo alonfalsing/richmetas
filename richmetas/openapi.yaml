@@ -258,6 +258,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Tx'
+        '401':
+          description: |
+            The request is not correctly signed.
+        '409':
+          description: |
+            The stark_key or address is already registerd.
 
   /clients/{address}:
     get:
@@ -271,6 +277,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: cold
+          in: query
+          required: false
+          schema:
+            type: boolean
       responses:
         '200':
           description: OK

@@ -15,7 +15,7 @@ from openapi_core import create_spec
 from rororo import OperationTableDef, setup_openapi, openapi_context
 from services.external_api.base_client import RetryConfig
 from sqlalchemy import select, desc, null, false, true
-from sqlalchemy.exc import NoResultFound, IntegrityError
+from sqlalchemy.exc import NoResultFound, IntegrityError, MultipleResultsFound
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import functions
 from starkware.crypto.signature.fast_pedersen_hash import pedersen_hash
@@ -44,11 +44,40 @@ async def get_contracts(request: Request):
 @operations.register
 async def register_client(request: Request):
     with openapi_context(request) as context:
+        address = utils.to_checksum_address(context.data['address'])
+        message_hash = pedersen_hash(
+            parse_int(address),
+            pedersen_hash(parse_int(context.data['nonce']), 0))
+        signature = context.parameters.query['signature']
+        stark_key = parse_int(context.data['stark_key'])
+        if not verify(message_hash, signature[0], signature[1], stark_key):
+            return web.HTTPUnauthorized()
+
+        async with request.config_dict['async_session']() as session:
+            from richmetas.models import Account
+            try:
+                account = (await session.execute(
+                    select(Account).
+                    where((Account.stark_key == Decimal(stark_key)) |
+                          (Account.address == address)))).scalar_one_or_none()
+                if not account:
+                    account = Account(stark_key=stark_key)
+                    session.add(account)
+                if account.address is None:
+                    account.address = address
+            except MultipleResultsFound:
+                return web.HTTPConflict()
+
+            if account.stark_key != stark_key or account.address != address:
+                return web.HTTPConflict()
+
+            await session.commit()
+
         tx = await request.config_dict['richmetas']. \
             register_client(context.data['stark_key'],
                             context.data['address'],
                             context.data['nonce'],
-                            context.parameters.query['signature'])
+                            signature)
 
         return web.json_response({'transaction_hash': tx})
 
@@ -56,12 +85,26 @@ async def register_client(request: Request):
 @operations.register
 async def get_client(request: Request):
     with openapi_context(request) as context:
-        stark_key = await request.config_dict['richmetas']. \
-            get_client(context.parameters.path['address'])
-        if stark_key == 0:
-            return web.HTTPNotFound()
+        if context.parameters.query.get('cold'):
+            stark_key = await request.config_dict['richmetas']. \
+                get_client(context.parameters.path['address'])
+            if stark_key == 0:
+                return web.HTTPNotFound()
 
-        return web.json_response({'stark_key': str(stark_key)})
+            return web.json_response({'stark_key': str(stark_key)})
+
+        async with request.config_dict['async_session']() as session:
+            from richmetas.models import Account
+
+            try:
+                address = utils.to_checksum_address(context.parameters.path['address'])
+                account = (await session.execute(
+                    select(Account).
+                    where(Account.address == address))).scalar_one()
+
+                return web.json_response({'stark_key': '{:f}'.format(account.stark_key)})
+            except NoResultFound:
+                return web.HTTPNotFound()
 
 
 @operations.register
