@@ -13,11 +13,12 @@ from sqlalchemy.orm import selectinload
 from web3 import Web3
 
 from richmetas.contracts import ERC20, ERC721Metadata
-from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint
+from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint, Transfer
 from richmetas.models.LimitOrder import Side
 from richmetas.models.TokenContract import KIND_ERC721
 from richmetas.models.Transaction import Transaction, TYPE_DEPLOY
-from richmetas.services import async_session
+from richmetas.globals import async_session
+from richmetas.services import TransferService
 from richmetas.utils import to_checksum_address, parse_int, ZERO_ADDRESS
 
 
@@ -26,6 +27,7 @@ class RichmetasInterpreter:
         self.session = session
         self.client = client
         self.w3 = w3
+        self._transfer_service = TransferService(self.session)
 
     async def exec(self, tx: Transaction):
         from starkware.starknet.public.abi import get_selector_from_name
@@ -91,32 +93,63 @@ class RichmetasInterpreter:
 
     async def withdraw(self, tx: Transaction):
         logging.warning(f'withdraw')
-        _user, amount_or_id, contract, _address, _nonce = tx.calldata
-        token = await self.lift_token(amount_or_id, contract)
+        user, amount_or_token_id, contract, _address, _nonce = tx.calldata
+        token = await self.lift_token(amount_or_token_id, contract)
         if token:
             token.owner = None
             token.latest_tx = tx
+        else:
+            token_contract = (await self.session.execute(
+                select(TokenContract).
+                where(TokenContract.address == to_checksum_address(contract)))).scalar_one()
+            account = await self._transfer_service.lift_account(parse_int(user))
+            balance = await self._transfer_service.lift_balance(account, token_contract)
+            balance.amount -= parse_int(amount_or_token_id)
 
     async def deposit(self, tx: Transaction):
         logging.warning(f'deposit')
-        _from_address, user, amount_or_id, contract, _nonce = tx.calldata
+        _from_address, user, amount_or_token_id, contract, _nonce = tx.calldata
         account = await self.lift_account(user)
-        token = await self.lift_token(amount_or_id, contract)
+        token = await self.lift_token(amount_or_token_id, contract)
         if token:
             token.owner = account
             token.latest_tx = tx
+        else:
+            token_contract = (await self.session.execute(
+                select(TokenContract).
+                where(TokenContract.address == to_checksum_address(contract)))).scalar_one()
+            balance = await self._transfer_service.lift_balance(account, token_contract)
+            balance.amount += parse_int(amount_or_token_id)
 
     async def transfer(self, tx: Transaction):
         logging.warning(f'transfer')
-        from_address, to_address, amount_or_token_id, contract, _nonce = tx.calldata
-        from_account = await self.lift_account(from_address)
-        to_account = await self.lift_account(to_address)
+        from_address, to_address, amount_or_token_id, contract, nonce = tx.calldata
         token = await self.lift_token(amount_or_token_id, contract)
         if token:
-            assert token.owner == from_account
+            from_account = await self.lift_account(from_address)
+            to_account = await self.lift_account(to_address)
 
+            assert token.owner == from_account
             token.owner = to_account
             token.latest_tx = tx
+        else:
+            status = tx.block._document['status']
+            try:
+                transfer = (await self.session.execute(
+                    select(Transfer).where(Transfer.hash == tx.hash))).scalar_one()
+                transfer.status = status
+            except NoResultFound:
+                token_contract = (await self.session.execute(
+                    select(TokenContract).
+                    where(TokenContract.address == to_checksum_address(contract)))).scalar_one()
+                await TransferService(self.session).transfer(
+                    tx.hash,
+                    parse_int(from_address),
+                    parse_int(to_address),
+                    parse_int(amount_or_token_id),
+                    token_contract,
+                    parse_int(nonce),
+                    status=status)
 
     async def create_order(self, tx: Transaction):
         logging.warning(f'create_order')
@@ -139,6 +172,9 @@ class RichmetasInterpreter:
         if not limit_order.bid:
             assert token.owner == account
             token.ask = limit_order
+        else:
+            balance = await self._transfer_service.lift_balance(account, quote_contract)
+            balance.amount -= limit_order.quote_amount
 
     async def fulfill_order(self, tx: Transaction):
         logging.warning(f'fulfill_order')
@@ -147,18 +183,27 @@ class RichmetasInterpreter:
             select(LimitOrder).
             where(LimitOrder.order_id == Decimal(order_id)).
             options(selectinload(LimitOrder.token),
-                    selectinload(LimitOrder.user)))).one()
+                    selectinload(LimitOrder.user),
+                    selectinload(LimitOrder.quote_contract)))).one()
         limit_order.closed_tx = tx
         limit_order.fulfilled = True
 
         token = limit_order.token
         token.latest_tx = tx
         token.ask = None
+
+        user = await self.lift_account(user)
         if limit_order.bid:
             token.owner = limit_order.user
+            balance = await self._transfer_service.lift_balance(user, limit_order.quote_contract)
+            balance.amount += limit_order.quote_amount
         else:
             user = await self.lift_account(user)
             token.owner = user
+            balance = await self._transfer_service.lift_balance(user, limit_order.quote_contract)
+            balance.amount -= limit_order.quote_amount
+            balance = await self._transfer_service.lift_balance(limit_order.user, limit_order.quote_contract)
+            balance.amount += limit_order.quote_amount
 
     async def cancel_order(self, tx: Transaction):
         logging.warning(f'cancel_order')
@@ -169,7 +214,12 @@ class RichmetasInterpreter:
             options(selectinload(LimitOrder.token)))).one()
         limit_order.closed_tx = tx
         limit_order.fulfilled = False
-        limit_order.token.ask = None
+
+        if limit_order.bid:
+            balance = await self._transfer_service.lift_balance(limit_order.user, limit_order.quote_contract)
+            balance.amount += limit_order.quote_amount
+        else:
+            limit_order.token.ask = None
 
     async def lift_account(self, user: str, address: Optional[str] = None) -> Account:
         user = Decimal(user)

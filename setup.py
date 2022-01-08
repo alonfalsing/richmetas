@@ -11,6 +11,7 @@ setup(
     install_requires=[
         'aiohttp',
         'aiohttp-sqlalchemy',
+        'aiojobs',
         'asyncpg',
         'cairo-lang',
         'click',

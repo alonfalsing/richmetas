@@ -82,4 +82,5 @@ def sign_stark_inputs(private_key: int, inputs: [str]):
     message_hash = functools.reduce(
         lambda x, y: pedersen_hash(y, x),
         reversed([int(x, 16) if x.startswith('0x') else int(x) for x in inputs]), 0)
+    print(message_hash)
     print(sign(msg_hash=message_hash, priv_key=private_key))

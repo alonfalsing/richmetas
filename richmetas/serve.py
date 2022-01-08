@@ -1,6 +1,5 @@
 import functools
 from decimal import Decimal
-from enum import Enum
 from typing import Union
 
 import click
@@ -9,6 +8,7 @@ import pkg_resources
 import pyrsistent
 from aiohttp import web
 from aiohttp.web_request import Request
+from aiojobs.aiohttp import setup, spawn
 from decouple import config
 from eth_account import Account
 from openapi_core import create_spec
@@ -20,23 +20,17 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import functions
 from starkware.crypto.signature.fast_pedersen_hash import pedersen_hash
 from starkware.crypto.signature.signature import verify
+from starkware.starknet.definitions.general_config import StarknetGeneralConfig, StarknetChainId
 from starkware.starknet.services.api.feeder_gateway.feeder_gateway_client import FeederGatewayClient
 from starkware.starknet.services.api.gateway.gateway_client import GatewayClient
 from web3 import Web3
 
+from richmetas import utils
 from richmetas.contracts import Forwarder, ReqSchema, StarkRichmetas, LimitOrder, EtherRichmetas, ContractKind
-from richmetas.utils import parse_int
+from richmetas.services import TransferService
+from richmetas.utils import parse_int, Status
 
 operations = OperationTableDef()
-
-
-class Status(Enum):
-    NOT_RECEIVED = 'NOT_RECEIVED'
-    RECEIVED = 'RECEIVED'
-    PENDING = 'PENDING'
-    REJECTED = 'REJECTED'
-    ACCEPTED_ON_L2 = 'ACCEPTED_ON_L2'
-    ACCEPTED_ON_L1 = 'ACCEPTED_ON_L1'
 
 
 @operations.register
@@ -387,11 +381,27 @@ async def get_token(request: Request):
 @operations.register
 async def get_balance(request: Request):
     with openapi_context(request) as context:
-        balance = await request.config_dict['richmetas'].get_balance(
-            context.parameters.query['user'],
-            context.parameters.query['contract'])
+        if context.parameters.query.get('cold'):
+            balance = await request.config_dict['richmetas'].get_balance(
+                context.parameters.query['user'],
+                context.parameters.query['contract'])
 
-        return web.json_response({'balance': str(balance)})
+            return web.json_response({'balance': str(balance)})
+
+        async with request.config_dict['async_session']() as session:
+            from richmetas.models import Balance, Account, TokenContract
+
+            try:
+                balance = (await session.execute(
+                    select(Balance).
+                    join(Balance.account).
+                    join(Balance.contract).
+                    where(Account.stark_key == Decimal(context.parameters.query['user'])).
+                    where(TokenContract.address == utils.to_checksum_address(context.parameters.query['contract'])))).scalar_one()
+
+                return web.json_response({'balance': '{:f}'.format(balance.amount)})
+            except NoResultFound:
+                return web.json_response({'balance': str(0)})
 
 
 @operations.register
@@ -433,16 +443,51 @@ async def withdraw(request: Request):
 
 @operations.register
 async def transfer(request: Request):
-    with openapi_context(request) as context:
-        tx = await request.config_dict['richmetas'].transfer(
-            context.data['from'],
-            context.data['to'],
-            context.data['amount_or_token_id'],
-            context.data['contract'],
-            context.data['nonce'],
-            context.parameters.query['signature'])
+    async with request.config_dict['async_session']() as session:
+        from richmetas.models import TokenContract, Transfer
 
-        return web.json_response({'transaction_hash': tx})
+        with openapi_context(request) as context:
+            try:
+                token_contract = (await session.execute(
+                    select(TokenContract).where(TokenContract.address == context.data['contract']))).scalar_one()
+            except NoResultFound:
+                return web.HTTPBadRequest()
+
+            if not token_contract.fungible:
+                tx = request.config_dict['richmetas'].transfer(
+                    context.data['from'],
+                    context.data['to'],
+                    context.data['amount_or_token_id'],
+                    context.data['contract'],
+                    context.data['nonce'],
+                    context.parameters.query['signature'])
+
+                return web.json_response({'transaction_hash': tx})
+
+            tx = request.config_dict['richmetas']._invoke(
+                'transfer',
+                [
+                    context.data['from'],
+                    context.data['to'],
+                    context.data['amount_or_token_id'],
+                    context.data['contract'],
+                    context.data['nonce'],
+                ],
+                context.parameters.query['signature']
+            )
+
+        message_hash = functools.reduce(lambda x, y: pedersen_hash(y, x), reversed(tx.calldata[1:]), 0)
+        if not verify(message_hash, tx.signature[0], tx.signature[1], tx.calldata[0]):
+            return web.HTTPUnauthorized()
+
+        hash_ = '0x%x' % tx.calculate_hash(request.config_dict['starknet_general_config'])
+        if not (await session.execute(select(Transfer).where(Transfer.hash == hash_))).one_or_none():
+            await TransferService(session).transfer(
+                hash_, tx.calldata[0], tx.calldata[1], tx.calldata[2], token_contract, tx.calldata[4], tx.signature)
+            await session.commit()
+            await spawn(request, request.config_dict['gateway'].add_transaction(tx))
+
+    return web.json_response({'transaction_hash': hash_})
 
 
 @operations.register
@@ -619,7 +664,7 @@ def authenticate(message: list[Union[int, str, bytes]], signature: list[str], st
 @click.option('--port', default=4000, type=int)
 def serve(port: int):
     from pathlib import Path
-    from .services import async_session
+    from .globals import async_session
 
     app = web.Application()
     w3 = Web3()
@@ -635,12 +680,18 @@ def serve(port: int):
     app['feeder_gateway'] = FeederGatewayClient(
         url=config('FEEDER_GATEWAY_URL'),
         retry_config=RetryConfig(n_retries=1))
+    app['gateway'] = GatewayClient(
+            url=config('GATEWAY_URL'),
+            retry_config=RetryConfig(n_retries=1))
     app['richmetas'] = StarkRichmetas(
         config('STARK_RICHMETAS_CONTRACT_ADDRESS', cast=parse_int),
         app['feeder_gateway'],
-        GatewayClient(
-            url=config('GATEWAY_URL'),
-            retry_config=RetryConfig(n_retries=1)))
+        app['gateway'])
+    app['starknet_general_config'] = StarknetGeneralConfig(
+        chain_id={
+            'mainnet': StarknetChainId.MAINNET,
+            'testnet': StarknetChainId.TESTNET,
+        }[config('STARK_NETWORK')])
     app['async_session'] = async_session
 
     app['bucket_root'] = Path(config('BUCKET_ROOT'))
@@ -660,5 +711,7 @@ def serve(port: int):
         schema=schema,
         spec=create_spec(schema),
         cors_middleware_kwargs=dict(allow_all=True))
+
+    setup(app)
 
     web.run_app(app, port=port)

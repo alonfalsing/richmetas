@@ -663,12 +663,17 @@ paths:
           in: query
           required: true
           schema:
-            type: string
+            type: integer
         - name: contract
           in: query
           required: true
           schema:
             type: string
+        - name: cold
+          in: query
+          required: false
+          schema:
+            type: boolean
       responses:
         '200':
           description: OK
@@ -829,6 +834,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Tx'
+        '400':
+          description: |
+            The contract is not registered yet.
+        '401':
+          description: |
+            The request is not correctly signed.
 
   /orders:
     get:
