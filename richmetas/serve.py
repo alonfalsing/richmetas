@@ -219,23 +219,37 @@ async def register_collection(request: Request):
                     int(blueprint.minter.stark_key)):
                 return web.HTTPUnauthorized()
 
-            token_contract = TokenContract(
-                address=context.data['address'],
-                fungible=False,
-                blueprint=blueprint,
-                name=context.data['name'],
-                symbol=context.data['symbol'],
-                decimals=0,
-                base_uri=context.data['base_uri'],
-                image=context.data['image'],
-                background_image=context.data['background_image'],
-                description=context.data['description'])
-            session.add(token_contract)
+            try:
+                token_contract = (await session.execute(
+                    select(TokenContract).
+                    where(TokenContract.address == context.data['address']).
+                    where(TokenContract.fungible == false()))).scalar_one()
 
+                token_contract.blueprint = blueprint
+                token_contract.name = context.data['name']
+                token_contract.symbol = context.data['symbol']
+                token_contract.base_uri = context.data['base_uri']
+                token_contract.image = context.data['image']
+                token_contract.background_image = context.data['background_image']
+                token_contract.description = context.data['description']
+            except NoResultFound:
+                token_contract = TokenContract(
+                    address=context.data['address'],
+                    fungible=False,
+                    blueprint=blueprint,
+                    name=context.data['name'],
+                    symbol=context.data['symbol'],
+                    decimals=0,
+                    base_uri=context.data['base_uri'],
+                    image=context.data['image'],
+                    background_image=context.data['background_image'],
+                    description=context.data['description'])
+                session.add(token_contract)
+
+            await session.commit()
             req, signature = request.config_dict['forwarder'].forward(
                 *request.config_dict['ether_richmetas'].register_contract(
                     token_contract.address, ContractKind.ERC721, int(blueprint.minter.stark_key)))
-            await session.commit()
 
             return web.json_response({
                 'req': ReqSchema().dump(req),
