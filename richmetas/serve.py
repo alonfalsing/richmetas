@@ -185,6 +185,19 @@ async def register_collection(request: Request):
         async with request.config_dict['async_session']() as session:
             from richmetas.models import TokenContract, Account, Blueprint
 
+            try:
+                token_contract = (await session.execute(
+                    select(TokenContract).
+                    where(TokenContract.address == utils.to_checksum_address(context.data['address'])).
+                    where(TokenContract.fungible == false()).
+                    options(selectinload(TokenContract.blueprint).
+                            selectinload(Blueprint.minter)))).scalar_one()
+            except NoResultFound:
+                token_contract = TokenContract(
+                    address=context.data['address'],
+                    fungible=False)
+                session.add(token_contract)
+
             if 'blueprint' in context.data:
                 blueprint = (await session.execute(
                     select(Blueprint).
@@ -192,20 +205,25 @@ async def register_collection(request: Request):
                     options(
                         selectinload(Blueprint.minter),
                         selectinload(Blueprint.contract)))).scalar_one()
-                if blueprint.contract:
+                if blueprint.contract is not None and \
+                        blueprint.contract != token_contract:
                     return web.HTTPBadRequest()
             else:
                 minter = parse_int(context.data['minter'])
                 try:
                     account = (await session.execute(
                         select(Account).
-                        where(Account.address == minter))).scalar_one()
+                        where(Account.stark_key == Decimal(minter)))).scalar_one()
                 except NoResultFound:
                     account = Account(stark_key=minter)
                     session.add(account)
 
-                blueprint = Blueprint(account)
+                blueprint = Blueprint(minter=account)
                 session.add(blueprint)
+
+            if token_contract.blueprint is not None and \
+                    token_contract.blueprint.minter != blueprint.minter:
+                return web.HTTPForbidden()
 
             if not authenticate(
                     [context.data['address'],
@@ -219,32 +237,13 @@ async def register_collection(request: Request):
                     int(blueprint.minter.stark_key)):
                 return web.HTTPUnauthorized()
 
-            try:
-                token_contract = (await session.execute(
-                    select(TokenContract).
-                    where(TokenContract.address == context.data['address']).
-                    where(TokenContract.fungible == false()))).scalar_one()
-
-                token_contract.blueprint = blueprint
-                token_contract.name = context.data['name']
-                token_contract.symbol = context.data['symbol']
-                token_contract.base_uri = context.data['base_uri']
-                token_contract.image = context.data['image']
-                token_contract.background_image = context.data['background_image']
-                token_contract.description = context.data['description']
-            except NoResultFound:
-                token_contract = TokenContract(
-                    address=context.data['address'],
-                    fungible=False,
-                    blueprint=blueprint,
-                    name=context.data['name'],
-                    symbol=context.data['symbol'],
-                    decimals=0,
-                    base_uri=context.data['base_uri'],
-                    image=context.data['image'],
-                    background_image=context.data['background_image'],
-                    description=context.data['description'])
-                session.add(token_contract)
+            token_contract.blueprint = blueprint
+            token_contract.name = context.data['name']
+            token_contract.symbol = context.data['symbol']
+            token_contract.base_uri = context.data['base_uri']
+            token_contract.image = context.data['image']
+            token_contract.background_image = context.data.get('background_image')
+            token_contract.description = context.data.get('description')
 
             await session.commit()
             req, signature = request.config_dict['forwarder'].forward(
