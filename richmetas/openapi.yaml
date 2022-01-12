@@ -381,15 +381,6 @@ paths:
                   total:
                     type: integer
                 required: [data, total]
-        '400':
-          description: |
-            The blueprint is used.
-        '401':
-          description: |
-            The request is not correctly signed.
-        '403':
-          description: |
-            Minter does not match.
 
     post:
       operationId: register_collection
@@ -473,6 +464,15 @@ paths:
                   signature:
                     type: string
                 required: [req, signature]
+        '400':
+          description: |
+            The blueprint is used.
+        '401':
+          description: |
+            The request is not correctly signed.
+        '403':
+          description: |
+            Minter does not match.
 
   /collections/{address}:
     get:
