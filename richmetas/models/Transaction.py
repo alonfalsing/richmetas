@@ -1,3 +1,4 @@
+from marshmallow import Schema, fields
 from sqlalchemy import Column, Integer, String, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from .Base import Base
@@ -20,3 +21,13 @@ class Transaction(Base):
 
     block = relationship('Block', back_populates='transactions')
     contract = relationship('StarkContract', back_populates='transactions')
+
+
+class TransactionSchema(Schema):
+    hash = fields.String()
+    block_number = fields.Integer()
+    transaction_index = fields.Integer()
+    type = fields.String()
+    entry_point_selector = fields.String()
+    entry_point_type = fields.String()
+    calldata = fields.Raw()

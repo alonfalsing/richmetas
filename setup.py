@@ -30,6 +30,7 @@ setup(
             'interpret = richmetas.interpret:cli',
             'serve = richmetas.serve:serve',
             'stark = richmetas.stark_key:cli',
+            'trace = richmetas.trace:cli',
         ],
     },
 )

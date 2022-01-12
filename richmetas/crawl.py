@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from asyncio import Future
 from datetime import datetime, timezone
 
 import click
@@ -40,8 +41,21 @@ class Crawler:
         self._async_session = async_session
         self._block_cache = BlockCache(async_session)
         self._cooldown = cooldown
+        self._blocks: set[int] = set()
+        self._waits: dict[int, list[Future]] = dict()
 
-    async def run(self, thru):
+    async def wait(self, block_number: int):
+        if block_number in self._blocks:
+            return
+
+        f = Future()
+        fs = self._waits.get(block_number, [])
+        fs.append(f)
+        self._waits[block_number] = fs
+
+        await f
+
+    async def run(self, thru=None):
         block = await self._feeder_gateway.get_block(block_hash=thru)
         i = j = block['block_number'] + 1
 
@@ -108,6 +122,9 @@ class Crawler:
 
         logging.warning(f'crawl_block(block_number={block_number})')
         await self._persist(await self._feeder_gateway.get_block(block_number=block_number))
+        self._blocks.add(block_number)
+        for each in self._waits.pop(block_number, []):
+            each.set_result(True)
 
     async def _persist(self, document):
         async with self._async_session() as session:
