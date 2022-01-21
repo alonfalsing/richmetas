@@ -1,5 +1,4 @@
 %lang starknet
-%builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import (HashBuiltin, SignatureBuiltin)
@@ -7,7 +6,7 @@ from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.starknet.common.messages import send_message_to_l1
-from starkware.starknet.common.syscalls import get_tx_signature
+from starkware.starknet.common.syscalls import get_caller_address, get_tx_signature
 
 const KIND_ERC20 = 1
 const KIND_ERC721 = 2
@@ -89,6 +88,15 @@ func constructor{
 end
 
 @view
+func get_admin{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}() -> (
+    adm : felt):
+    return admin.read()
+end
+
+@view
 func is_pause{
     syscall_ptr : felt*,
     pedersen_ptr : HashBuiltin*,
@@ -161,6 +169,42 @@ func get_order{
 end
 
 @external
+func set_admin{
+    syscall_ptr : felt*,
+    ecdsa_ptr : SignatureBuiltin*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    adm : felt,
+    nonce : felt):
+    alloc_locals
+
+    let (adm) = admin.read()
+    let inputs : felt* = alloc()
+    inputs[0] = adm
+    inputs[1] = nonce
+    verify_inputs_by_signature(adm, 2, inputs)
+
+    admin.write(adm)
+
+    return ()
+end
+
+@external
+func ac_set_admin{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    adm : felt):
+    let (caller) = get_caller_address()
+    let (old) = admin.read()
+    assert caller = old
+
+    admin.write(adm)
+
+    return()
+end
+
+@external
 func set_pause{
     syscall_ptr : felt*,
     ecdsa_ptr : SignatureBuiltin*,
@@ -169,7 +213,6 @@ func set_pause{
     paus_ : felt,
     nonce : felt):
     alloc_locals
-    assert paus_ * (paus_ - 1) = 0
 
     let (adm) = admin.read()
     let inputs : felt* = alloc()
@@ -177,6 +220,30 @@ func set_pause{
     inputs[1] = nonce
     verify_inputs_by_signature(adm, 2, inputs)
 
+    _set_pause(paus_)
+
+    return ()
+end
+
+@external
+func ac_set_pause{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    paus_ : felt):
+    let (caller) = get_caller_address()
+    let (adm) = admin.read()
+    assert caller = adm
+
+    return _set_pause(paus_)
+end
+
+func _set_pause{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    paus_ : felt):
+    assert paus_ * (paus_ - 1) = 0
     pause.write(paus_)
 
     return ()
@@ -242,6 +309,44 @@ func mint{
     token_id : felt,
     contract : felt,
     nonce : felt):
+    alloc_locals
+
+    let (desc) = description.read(contract=contract)
+    let inputs : felt* = alloc()
+    inputs[0] = user
+    inputs[1] = token_id
+    inputs[2] = contract
+    inputs[3] = nonce
+    verify_inputs_by_signature(desc.mint, 4, inputs)
+
+    local ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
+    _mint(user, token_id, contract)
+
+    return ()
+end
+
+@external
+func ac_mint{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    user : felt,
+    token_id : felt,
+    contract : felt):
+    let (caller) = get_caller_address()
+    let (desc) = description.read(contract=contract)
+    assert caller = desc.mint
+
+    return _mint(user, token_id, contract)
+end
+
+func _mint{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    user : felt,
+    token_id : felt,
+    contract : felt):
     check_on()
     assert_nn(token_id)
 
@@ -250,13 +355,6 @@ func mint{
 
     let (usr) = owner.read(token_id, contract)
     assert usr = 0
-
-    let inputs : felt* = alloc()
-    inputs[0] = user
-    inputs[1] = token_id
-    inputs[2] = contract
-    inputs[3] = nonce
-    verify_inputs_by_signature(desc.mint, 4, inputs)
 
     owner.write(token_id, contract, user)
     origin.write(token_id, contract, 1)
@@ -277,9 +375,6 @@ func withdraw{
     nonce : felt):
     alloc_locals
 
-    check_on()
-    assert_nn(amount_or_token_id)
-
     let inputs : felt* = alloc()
     inputs[0] = amount_or_token_id
     inputs[1] = contract
@@ -287,14 +382,45 @@ func withdraw{
     inputs[3] = nonce
     verify_inputs_by_signature(user, 4, inputs)
 
-    local ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
+    let ecdsa_ptr = ecdsa_ptr
+    _withdraw(user, amount_or_token_id, contract, address, nonce)
+
+    return ()
+end
+
+@external
+func ac_withdraw{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    amount_or_token_id : felt,
+    contract : felt,
+    address : felt,
+    nonce : felt):
+    let (user) = get_caller_address()
+
+    return _withdraw(user, amount_or_token_id, contract, address, nonce)
+end
+
+func _withdraw{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    user : felt,
+    amount_or_token_id : felt,
+    contract : felt,
+    address : felt,
+    nonce : felt):
+    alloc_locals
+
+    check_on()
+    assert_nn(amount_or_token_id)
+
     let (desc) = description.read(contract=contract)
     assert (desc.kind - KIND_ERC20) * (desc.kind - KIND_ERC721) = 0
 
-    let (local org) = origin.read(amount_or_token_id, contract)
+    let (org) = origin.read(amount_or_token_id, contract)
     if desc.kind == KIND_ERC20:
-        assert_nn(amount_or_token_id)
-
         let (bal) = balance.read(user=user, contract=contract)
         let new_balance = bal - amount_or_token_id
         assert_nn(new_balance)
@@ -367,18 +493,45 @@ func transfer{
     nonce : felt):
     alloc_locals
 
-    check_on()
-    assert_nn(amount_or_token_id)
-
-    let (desc) = description.read(contract=contract)
-    assert (desc.kind - KIND_ERC20) * (desc.kind - KIND_ERC721) = 0
-
     let inputs : felt* = alloc()
     inputs[0] = to_
     inputs[1] = amount_or_token_id
     inputs[2] = contract
     inputs[3] = nonce
     verify_inputs_by_signature(from_, 4, inputs)
+
+    let ecdsa_ptr = ecdsa_ptr
+    _transfer(from_, to_, amount_or_token_id, contract)
+
+    return ()
+end
+
+@external
+func ac_transfer{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    to_ : felt,
+    amount_or_token_id : felt,
+    contract : felt):
+    let (caller) = get_caller_address()
+
+    return _transfer(caller, to_, amount_or_token_id, contract)
+end
+
+func _transfer{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    from_ : felt,
+    to_ : felt,
+    amount_or_token_id : felt,
+    contract : felt):
+    check_on()
+    assert_nn(amount_or_token_id)
+
+    let (desc) = description.read(contract=contract)
+    assert (desc.kind - KIND_ERC20) * (desc.kind - KIND_ERC721) = 0
 
     if desc.kind == KIND_ERC20:
         let (bal) = balance.read(user=from_, contract=contract)
@@ -414,6 +567,49 @@ func create_order{
     quote_contract : felt,
     quote_amount : felt):
     alloc_locals
+
+    let inputs : felt* = alloc()
+    inputs[0] = id
+    inputs[1] = bid
+    inputs[2] = base_contract
+    inputs[3] = base_token_id
+    inputs[4] = quote_contract
+    inputs[5] = quote_amount
+    verify_inputs_by_signature(user, 6, inputs)
+
+    let ecdsa_ptr = ecdsa_ptr
+    _create_order(id, user, bid, base_contract, base_token_id, quote_contract, quote_amount)
+
+    return ()
+end
+
+@external
+func ac_create_order{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    id : felt,
+    bid : felt,
+    base_contract : felt,
+    base_token_id : felt,
+    quote_contract : felt,
+    quote_amount : felt):
+    let (caller) = get_caller_address()
+
+    return _create_order(id, caller, bid, base_contract, base_token_id, quote_contract, quote_amount)
+end
+
+func _create_order{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    id : felt,
+    user : felt,
+    bid : felt,
+    base_contract : felt,
+    base_token_id : felt,
+    quote_contract : felt,
+    quote_amount : felt):
     check_on()
 
     assert (bid - ASK) * (bid - BID) = 0
@@ -426,17 +622,6 @@ func create_order{
     assert desc.kind = KIND_ERC721
     let (desc) = description.read(contract=quote_contract)
     assert desc.kind = KIND_ERC20
-
-    let inputs : felt* = alloc()
-    inputs[0] = id
-    inputs[1] = bid
-    inputs[2] = base_contract
-    inputs[3] = base_token_id
-    inputs[4] = quote_contract
-    inputs[5] = quote_amount
-    verify_inputs_by_signature(user, 6, inputs)
-
-    local ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     if bid == ASK:
         let (usr) = owner.read(token_id=base_token_id, contract=base_contract)
         assert usr = user
@@ -472,18 +657,42 @@ func fulfill_order{
     user : felt,
     nonce : felt):
     alloc_locals
-    check_on()
 
     let inputs : felt* = alloc()
     inputs[0] = id
     inputs[1] = nonce
     verify_inputs_by_signature(user, 2, inputs)
 
-    let (local ord) = order.read(id)
+    let ecdsa_ptr = ecdsa_ptr
+    _fulfill_order(id, user)
+
+    return ()
+end
+
+@external
+func ac_fulfill_order{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    id : felt):
+    let (caller) = get_caller_address()
+
+    return _fulfill_order(id, caller)
+end
+
+func _fulfill_order{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    id : felt,
+    user : felt):
+    alloc_locals
+    check_on()
+
+    let (ord) = order.read(id)
     assert_not_zero(ord.user)
     assert ord.state = STATE_NEW
 
-    local ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     if ord.bid == ASK:
         let (bal) = balance.read(user=user, contract=ord.quote_contract)
         let new_balance = bal - ord.quote_amount
@@ -526,18 +735,43 @@ func cancel_order{
     id : felt,
     nonce : felt):
     alloc_locals
-    check_on()
 
-    let (local ord) = order.read(id)
-    assert_not_zero(ord.user)
-    assert ord.state = STATE_NEW
-
+    let (ord) = order.read(id)
     let inputs : felt* = alloc()
     inputs[0] = id
     inputs[1] = nonce
     verify_inputs_by_signature(ord.user, 2, inputs)
 
-    local ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
+    let ecdsa_ptr = ecdsa_ptr
+    _cancel_order(id, ord)
+
+    return ()
+end
+
+@external
+func ac_cancel_order{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    id : felt):
+    let (caller) = get_caller_address()
+    let (ord) = order.read(id)
+    assert caller = ord.user
+
+    return _cancel_order(id, ord)
+end
+
+func _cancel_order{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(
+    id : felt,
+    ord : LimitOrder):
+    check_on()
+
+    assert_not_zero(ord.user)
+    assert ord.state = STATE_NEW
+
     if ord.bid == ASK:
         let (usr) = owner.read(token_id=ord.base_token_id, contract=ord.base_contract)
         assert usr = 0
