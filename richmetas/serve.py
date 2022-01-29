@@ -381,10 +381,10 @@ async def find_tokens(request: Request):
                     where(Token.name.ilike(f'%{q}%'))
             if owner:
                 stmt = stmt.join(Token.owner). \
-                    where(Account.address == owner)
+                    where(Account.address == Web3.toChecksumAddress(owner))
             if collection:
                 stmt = stmt.join(Token.contract). \
-                    where(TokenContract.address == collection)
+                    where(TokenContract.address == Web3.toChecksumAddress(collection))
 
             return stmt
 
