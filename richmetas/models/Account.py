@@ -25,6 +25,9 @@ class Account(Base):
     def address(self, address):
         self._address = Web3.toChecksumAddress(address)
 
+    def __eq__(self, other):
+        return isinstance(other, Account) and self.stark_key == other.stark_key
+
 
 class AccountSchema(Schema):
     stark_key = BigNumber()

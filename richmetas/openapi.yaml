@@ -42,6 +42,24 @@ components:
           nullable: true
       required: [stark_key]
 
+    Block:
+      type: object
+      properties:
+        hash:
+          type: string
+        timestamp:
+          type: string
+      required: [hash, timestamp]
+
+    Transaction:
+      type: object
+      properties:
+        hash:
+          type: string
+        block:
+          $ref: '#/components/schemas/Block'
+      required: [hash, block]
+
     Blueprint:
       type: object
       properties:
@@ -88,6 +106,41 @@ components:
             blueprint:
               $ref: '#/components/schemas/Blueprint'
 
+    Balance:
+      type: object
+      properties:
+        contract:
+          $ref: '#/components/schemas/Collection'
+        amount:
+          type: string
+      required: [contract, amount]
+
+    Deposit:
+      type: object
+      properties:
+        transaction:
+          $ref: '#/components/schemas/Transaction'
+        balance:
+          $ref: '#/components/schemas/Balance'
+        amount:
+          type: string
+      required: [transaction, balance, amount]
+
+    Withdrawal:
+      type: object
+      properties:
+        transaction:
+          $ref: '#/components/schemas/Transaction'
+        balance:
+          $ref: '#/components/schemas/Balance'
+        amount:
+          type: string
+        address:
+          type: string
+        nonce:
+          type: string
+      required: [transaction, balance, amount, address, nonce]
+
     Metadata:
       type: object
       properties:
@@ -123,6 +176,23 @@ components:
               ask:
                 $ref: '#/components/schemas/LimitOrderCompact'
           - type: object
+
+    TokenFlow:
+      type: object
+      properties:
+        transaction:
+          $ref: '#/components/schemas/Transaction'
+        type:
+          type: string
+        token:
+          $ref: '#/components/schemas/Token'
+        address:
+          type: string
+          nullable: true
+        nonce:
+          type: string
+          nullable: true
+      required: [transaction, type, token]
 
     LimitOrderCompact:
       type: object
@@ -864,6 +934,96 @@ paths:
           description: |
             The request is rejected.
 
+  /deposits:
+    get:
+      operationId: find_deposits
+      summary: Find deposits
+      description: Find deposits by user or so.
+      tags: [token]
+      parameters:
+        - name: user
+          in: query
+          required: true
+          description: Stark key
+          schema:
+            type: string
+        - name: contract
+          in: query
+          description: Token contract address
+          schema:
+            type: string
+        - name: fungible
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: size
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/Deposit'
+                        - $ref: '#/components/schemas/TokenFlow'
+
+  /withdrawals:
+    get:
+      operationId: find_withdrawals
+      summary: Find withdrawals
+      description: Find withdrawals by user or so.
+      tags: [token]
+      parameters:
+        - name: user
+          in: query
+          required: true
+          description: Ethereum address
+          schema:
+            type: string
+        - name: contract
+          in: query
+          description: Token contract address
+          schema:
+            type: string
+        - name: fungible
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: size
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/Withdrawal'
+                        - $ref: '#/components/schemas/TokenFlow'
+
   /orders:
     get:
       operationId: find_orders
@@ -877,7 +1037,7 @@ paths:
             type: string
         - name: user
           in: query
-          description: Stark key
+          description: Ethereum address
           schema:
             type: string
         - name: collection

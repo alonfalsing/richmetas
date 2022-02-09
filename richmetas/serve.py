@@ -16,7 +16,7 @@ from rororo import OperationTableDef, setup_openapi, openapi_context
 from services.external_api.base_client import RetryConfig
 from sqlalchemy import select, desc, null, false, true
 from sqlalchemy.exc import NoResultFound, IntegrityError, MultipleResultsFound
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, aliased
 from sqlalchemy.sql import functions
 from starkware.crypto.signature.fast_pedersen_hash import pedersen_hash
 from starkware.crypto.signature.signature import verify
@@ -549,6 +549,136 @@ async def transfer(request: Request):
             await spawn(request, request.config_dict['gateway'].add_transaction(tx))
 
     return web.json_response({'transaction_hash': hash_})
+
+
+@operations.register
+async def find_deposits(request: Request):
+    with openapi_context(request) as context:
+        user = utils.to_checksum_address(context.parameters.query.get('user'))
+        contract = context.parameters.query.get('contract')
+        fungible = context.parameters.query.get('fungible')
+        page = context.parameters.query.get('page', 1)
+        size = context.parameters.query.get('size', 100)
+
+    async with request.config_dict['async_session']() as session:
+        from richmetas.models import Transaction, Deposit, DepositSchema, Balance, \
+            TokenFlow, TokenFlowSchema, FlowType, TokenContract, Token, Account
+
+        def augment(stmt):
+            a1 = aliased(Account)
+            a2 = aliased(Account)
+            stmt = stmt. \
+                join(Transaction.deposit, isouter=True). \
+                join(Deposit.balance, isouter=True). \
+                join(Balance.account.of_type(a1), isouter=True). \
+                join(Transaction.token_flow, isouter=True). \
+                join(TokenFlow.to_account.of_type(a2), isouter=True). \
+                where((Deposit.id != null()) |
+                      ((TokenFlow.id != null()) &
+                       (TokenFlow.type == FlowType.DEPOSIT.value))). \
+                where((a1.address == user) | (a2.address == user))
+            if contract:
+                address = utils.to_checksum_address(contract)
+                c1 = aliased(TokenContract)
+                c2 = aliased(TokenContract)
+                stmt = stmt. \
+                    join(Balance.contract.of_type(c1), isouter=True). \
+                    join(TokenFlow.token, isouter=True). \
+                    join(Token.contract.of_type(c2), isouter=True). \
+                    where((c1.address == address) | (c2.address == address))
+            if fungible is not None:
+                stmt = stmt.where((Deposit.id if fungible else TokenFlow.id) != null())
+
+            return stmt
+
+        query = augment(select(Transaction)). \
+            order_by(desc(Transaction.block_number)). \
+            order_by(desc(Transaction.transaction_index)). \
+            limit(size). \
+            offset(size * (page - 1))
+        count = augment(select(functions.count()).select_from(Transaction))
+
+        return web.json_response({
+            'data': [
+                DepositSchema().dump(tx.deposit) if tx.deposit else
+                TokenFlowSchema().dump(tx.token_flow) for tx in
+                (await session.execute(
+                    query.options(
+                        selectinload(Transaction.block),
+                        selectinload(Transaction.deposit).
+                        selectinload(Deposit.balance).
+                        selectinload(Balance.contract),
+                        selectinload(Transaction.token_flow).
+                        selectinload(TokenFlow.token).
+                        selectinload(Token.contract)))).scalars()
+            ],
+            'total': (await session.execute(count)).scalar_one(),
+        })
+
+
+@operations.register
+async def find_withdrawals(request: Request):
+    with openapi_context(request) as context:
+        user = utils.to_checksum_address(context.parameters.query.get('user'))
+        contract = context.parameters.query.get('contract')
+        fungible = context.parameters.query.get('fungible')
+        page = context.parameters.query.get('page', 1)
+        size = context.parameters.query.get('size', 100)
+
+    async with request.config_dict['async_session']() as session:
+        from richmetas.models import Transaction, Withdrawal, WithdrawalSchema, Balance, \
+            TokenFlow, TokenFlowSchema, FlowType, TokenContract, Token, Account
+
+        def augment(stmt):
+            a1 = aliased(Account)
+            a2 = aliased(Account)
+            stmt = stmt. \
+                join(Transaction.withdrawal, isouter=True). \
+                join(Withdrawal.balance, isouter=True). \
+                join(Balance.account.of_type(a1), isouter=True). \
+                join(Transaction.token_flow, isouter=True). \
+                join(TokenFlow.from_account.of_type(a2), isouter=True). \
+                where((Withdrawal.id != null()) |
+                      ((TokenFlow.id != null()) &
+                       (TokenFlow.type == FlowType.WITHDRAWAL.value))). \
+                where((a1.address == user) | (a2.address == user))
+            if contract:
+                address = utils.to_checksum_address(contract)
+                c1 = aliased(TokenContract)
+                c2 = aliased(TokenContract)
+                stmt = stmt. \
+                    join(Balance.contract.of_type(c1), isouter=True). \
+                    join(TokenFlow.token, isouter=True). \
+                    join(Token.contract.of_type(c2), isouter=True). \
+                    where((c1.address == address) | (c2.address == address))
+            if fungible is not None:
+                stmt = stmt.where((Withdrawal.id if fungible else TokenFlow.id) != null())
+
+            return stmt
+
+        query = augment(select(Transaction)). \
+            order_by(desc(Transaction.block_number)). \
+            order_by(desc(Transaction.transaction_index)). \
+            limit(size). \
+            offset(size * (page - 1))
+        count = augment(select(functions.count()).select_from(Transaction))
+
+        return web.json_response({
+            'data': [
+                WithdrawalSchema().dump(tx.withdrawal) if tx.withdrawal else
+                TokenFlowSchema().dump(tx.token_flow) for tx in
+                (await session.execute(
+                    query.options(
+                        selectinload(Transaction.block),
+                        selectinload(Transaction.withdrawal).
+                        selectinload(Withdrawal.balance).
+                        selectinload(Balance.contract),
+                        selectinload(Transaction.token_flow).
+                        selectinload(TokenFlow.token).
+                        selectinload(Token.contract)))).scalars()
+            ],
+            'total': (await session.execute(count)).scalar_one(),
+        })
 
 
 @operations.register

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, Numeric, String, ForeignKey
 from sqlalchemy.orm import relationship
 
-from richmetas.models import Base
+from .Base import Base
 
 
 class Transfer(Base):

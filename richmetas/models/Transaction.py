@@ -1,6 +1,9 @@
+from marshmallow import Schema, fields
 from sqlalchemy import Column, Integer, String, JSON, ForeignKey
 from sqlalchemy.orm import relationship
+
 from .Base import Base
+from .Block import BlockSchema
 
 TYPE_DEPLOY = 'DEPLOY'
 
@@ -20,3 +23,11 @@ class Transaction(Base):
 
     block = relationship('Block', back_populates='transactions')
     contract = relationship('StarkContract', back_populates='transactions')
+    deposit = relationship('Deposit', back_populates='transaction', uselist=False)
+    withdrawal = relationship('Withdrawal', back_populates='transaction', uselist=False)
+    token_flow = relationship('TokenFlow', back_populates='transaction', uselist=False)
+
+
+class TransactionSchema(Schema):
+    hash = fields.String()
+    block = fields.Nested(BlockSchema())

@@ -14,7 +14,8 @@ from sqlalchemy.orm import selectinload
 from web3 import Web3
 
 from richmetas.contracts import ERC20, ERC721Metadata, StarkRichmetas
-from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint, Transfer
+from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint, Transfer, \
+    TokenFlow, FlowType, Withdrawal, Deposit
 from richmetas.models.LimitOrder import Side
 from richmetas.models.TokenContract import KIND_ERC721
 from richmetas.models.Transaction import Transaction, TYPE_DEPLOY
@@ -91,21 +92,47 @@ class RichmetasInterpreter:
         token.latest_tx = tx
 
         token.owner = await self.lift_account(user)
+        flow = TokenFlow(
+            transaction=tx,
+            type=FlowType.MINT.value,
+            token=token,
+            to_account=token.owner,
+        )
+        self.session.add(flow)
 
     async def withdraw(self, tx: Transaction):
         logging.warning(f'withdraw')
-        user, amount_or_token_id, contract, _address, _nonce = tx.calldata
+        user, amount_or_token_id, contract, address, nonce = tx.calldata
+        account = await self._transfer_service.lift_account(parse_int(user))
         token = await self.lift_token(amount_or_token_id, contract)
         if token:
+            assert token.owner == account
+            flow = TokenFlow(
+                transaction=tx,
+                type=FlowType.WITHDRAWAL.value,
+                token=token,
+                from_account=token.owner,
+                address=to_checksum_address(address),
+                nonce=parse_int(nonce),
+            )
+            self.session.add(flow)
+
             token.owner = None
             token.latest_tx = tx
         else:
             token_contract = (await self.session.execute(
                 select(TokenContract).
                 where(TokenContract.address == to_checksum_address(contract)))).scalar_one()
-            account = await self._transfer_service.lift_account(parse_int(user))
             balance = await self._transfer_service.lift_balance(account, token_contract)
-            balance.amount -= parse_int(amount_or_token_id)
+            withdrawal = Withdrawal(
+                transaction=tx,
+                balance=balance,
+                amount=parse_int(amount_or_token_id),
+                address=to_checksum_address(address),
+                nonce=parse_int(nonce),
+            )
+            self.session.add(withdrawal)
+            balance.amount -= withdrawal.amount
 
     async def deposit(self, tx: Transaction):
         logging.warning(f'deposit')
@@ -115,12 +142,26 @@ class RichmetasInterpreter:
         if token:
             token.owner = account
             token.latest_tx = tx
+
+            flow = TokenFlow(
+                transaction=tx,
+                type=FlowType.DEPOSIT.value,
+                token=token,
+                to_account=account,
+            )
+            self.session.add(flow)
         else:
             token_contract = (await self.session.execute(
                 select(TokenContract).
                 where(TokenContract.address == to_checksum_address(contract)))).scalar_one()
             balance = await self._transfer_service.lift_balance(account, token_contract)
-            balance.amount += parse_int(amount_or_token_id)
+            deposit = Deposit(
+                transaction=tx,
+                balance=balance,
+                amount=parse_int(amount_or_token_id),
+            )
+            self.session.add(deposit)
+            balance.amount += deposit.amount
 
     async def transfer(self, tx: Transaction):
         logging.warning(f'transfer')
@@ -133,6 +174,15 @@ class RichmetasInterpreter:
             assert token.owner == from_account
             token.owner = to_account
             token.latest_tx = tx
+
+            flow = TokenFlow(
+                transaction=tx,
+                type=FlowType.TRANSFER.value,
+                token=token,
+                from_account=from_account,
+                to_account=to_account,
+            )
+            self.session.add(flow)
         else:
             status = tx.block._document['status']
             try:

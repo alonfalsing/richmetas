@@ -1,6 +1,8 @@
+from marshmallow import Schema, fields
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship
+
 from .Base import Base
 
 
@@ -13,3 +15,8 @@ class Block(Base):
     _document = Column(JSON, nullable=False)
 
     transactions = relationship('Transaction', back_populates='block')
+
+
+class BlockSchema(Schema):
+    hash = fields.String()
+    timestamp = fields.DateTime()

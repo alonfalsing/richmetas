@@ -27,6 +27,7 @@ class Token(Base):
     owner = relationship('Account', back_populates='tokens')
     latest_tx = relationship('Transaction')
     ask = relationship('LimitOrder', foreign_keys=ask_id, post_update=True)
+    flows = relationship('TokenFlow', back_populates='token')
 
 
 class TokenSchema(Schema):

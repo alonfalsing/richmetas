@@ -1,7 +1,10 @@
+from marshmallow import Schema, fields
 from sqlalchemy import Column, Integer, Numeric, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from richmetas.models import Base
+from .Base import Base
+from .BigNumber import BigNumber
+from .TokenContract import TokenContractSchema
 
 
 class Balance(Base):
@@ -16,3 +19,10 @@ class Balance(Base):
 
     account = relationship('Account')
     contract = relationship('TokenContract')
+    deposits = relationship('Deposit', back_populates='balance')
+    withdrawals = relationship('Withdrawal', back_populates='balance')
+
+
+class BalanceSchema(Schema):
+    contract = fields.Nested(TokenContractSchema())
+    amount = BigNumber()
