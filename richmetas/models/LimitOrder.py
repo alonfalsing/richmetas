@@ -9,6 +9,7 @@ from .Base import Base
 from .BigNumber import BigNumber
 from .Token import TokenSchema
 from .TokenContract import TokenContractSchema
+from .Transaction import TransactionSchema
 
 
 class Side(IntEnum):
@@ -64,3 +65,4 @@ class LimitOrderCompactSchema(Schema):
 class LimitOrderSchema(LimitOrderCompactSchema):
     user = fields.Nested(AccountSchema())
     token = fields.Nested(TokenSchema())
+    tx = fields.Nested(TransactionSchema())

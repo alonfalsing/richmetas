@@ -60,6 +60,27 @@ components:
           $ref: '#/components/schemas/Block'
       required: [hash, block]
 
+    EtherBlock:
+      type: object
+      properties:
+        number:
+          type: integer
+        hash:
+          type: string
+        timestamp:
+          type: string
+      required: [number, hash, timestamp]
+
+    EtherEvent:
+      type: object
+      properties:
+        hash:
+          type: string
+        block:
+          $ref: '#/components/schemas/EtherBlock'
+      required: [hash, block]
+      nullable: true
+
     Blueprint:
       type: object
       properties:
@@ -139,6 +160,8 @@ components:
           type: string
         nonce:
           type: string
+        receipt:
+          $ref: '#/components/schemas/EtherEvent'
       required: [transaction, balance, amount, address, nonce]
 
     Metadata:
@@ -192,6 +215,8 @@ components:
         nonce:
           type: string
           nullable: true
+        receipt:
+          $ref: '#/components/schemas/EtherEvent'
       required: [transaction, type, token]
 
     LimitOrderCompact:
@@ -219,6 +244,8 @@ components:
               $ref: '#/components/schemas/Account'
             token:
               $ref: '#/components/schemas/Token'
+            tx:
+              $ref: '#/components/schemas/Transaction'
           required: [user, token]
 
     TransferRequest:
@@ -1045,6 +1072,11 @@ paths:
           description: Contract address
           schema:
             type: string
+        - name: token_id
+          in: query
+          description: Token ID
+          schema:
+            type: integer
         - name: side
           in: query
           schema:

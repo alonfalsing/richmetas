@@ -693,6 +693,7 @@ async def find_orders(request: Request):
         q = context.parameters.query.get('q')
         user = context.parameters.query.get('user')
         collection = context.parameters.query.get('collection')
+        token_id = context.parameters.query.get('token_id')
         side = context.parameters.query.get('side')
         state = context.parameters.query.get('state')
         sort = context.parameters.query.get('sort')
@@ -701,19 +702,20 @@ async def find_orders(request: Request):
         size = context.parameters.query.get('size', 100)
 
     async with request.config_dict['async_session']() as session:
-        from richmetas.models import LimitOrder, LimitOrderSchema, Account, Token, TokenContract
+        from richmetas.models import LimitOrder, LimitOrderSchema, Account, Token, TokenContract, Transaction
 
         def augment(stmt):
+            stmt = stmt.join(LimitOrder.token)
             if q:
-                stmt = stmt.join(LimitOrder.token). \
-                    where(Token.name.ilike(f'%{q}%'))
+                stmt = stmt.where(Token.name.ilike(f'%{q}%'))
             if user:
                 stmt = stmt.join(LimitOrder.user). \
                     where(Account.address == user)
             if collection:
-                stmt = stmt.join(LimitOrder.token). \
-                    join(Token.contract). \
+                stmt = stmt.join(Token.contract). \
                     where(TokenContract.address == collection)
+            if token_id:
+                stmt = stmt.where(Token.token_id == token_id)
             if side:
                 stmt = stmt.where(LimitOrder.bid == (side == 'bid'))
             if state is not None:
@@ -721,11 +723,16 @@ async def find_orders(request: Request):
 
             return stmt
 
-        so = dict(price=LimitOrder.quote_amount).get(sort, LimitOrder.id)
         query = augment(select(LimitOrder)). \
-            order_by(so if asc else desc(so)). \
             limit(size). \
             offset(size * (page - 1))
+        if sort == 'price':
+            query = query.order_by(LimitOrder.quote_amount if asc else desc(LimitOrder.quote_amount))
+        else:
+            query = query.join(LimitOrder.tx). \
+                order_by(Transaction.block_number if asc else desc(Transaction.block_number)). \
+                order_by(Transaction.transaction_index if asc else desc(Transaction.transaction_index))
+
         count = augment(select(functions.count()).select_from(LimitOrder))
 
         return web.json_response({
@@ -738,7 +745,9 @@ async def find_orders(request: Request):
                         selectinload(Token.contract).
                         selectinload(TokenContract.blueprint),
                         selectinload(LimitOrder.quote_contract).
-                        selectinload(TokenContract.blueprint)))).scalars())),
+                        selectinload(TokenContract.blueprint),
+                        selectinload(LimitOrder.tx).
+                        selectinload(Transaction.block)))).scalars())),
             'total': (await session.execute(count)).scalar_one(),
         })
 
