@@ -16,6 +16,9 @@ from .TokenFlow import TokenFlow, TokenFlowSchema, FlowType
 from .Transfer import Transfer
 from .Withdrawal import Withdrawal, WithdrawalSchema
 
+from .EthBlock import EthBlock
+from .EthEvent import EthEvent
+
 
 class TokenContractVerboseSchema(TokenContractSchema):
     blueprint = fields.Nested(BlueprintSchema())

@@ -8,4 +8,4 @@ class BigNumber(fields.Field):
         if value is None:
             return None
 
-        return '{:f}'.format(value)
+        return '{:d}'.format(int(value))

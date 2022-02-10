@@ -7,6 +7,7 @@ from web3 import Web3
 from .Balance import BalanceSchema
 from .Base import Base
 from .BigNumber import BigNumber
+from .EthEvent import EthEventSchema
 from .Transaction import TransactionSchema
 
 
@@ -19,6 +20,7 @@ class Withdrawal(Base):
     amount = Column(Numeric(precision=80), nullable=False)
     _address = Column(String, nullable=False)
     nonce = Column(Numeric(precision=80), nullable=False)
+    event_id = Column(Integer, ForeignKey('eth_event.id'), unique=True)
 
     @hybrid_property
     def address(self):
@@ -30,6 +32,7 @@ class Withdrawal(Base):
 
     transaction = relationship('Transaction', back_populates='withdrawal')
     balance = relationship('Balance', back_populates='withdrawals')
+    event = relationship('EthEvent')
 
 
 class WithdrawalSchema(Schema):
@@ -38,3 +41,4 @@ class WithdrawalSchema(Schema):
     amount = BigNumber()
     address = fields.String()
     nonce = BigNumber()
+    receipt = fields.Nested(EthEventSchema(), attribute='event')

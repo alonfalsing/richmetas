@@ -15,6 +15,7 @@ setup(
         'asyncpg',
         'cairo-lang',
         'click',
+        'ethereum',
         'jsonschema',
         'marshmallow',
         'pendulum',
@@ -30,6 +31,7 @@ setup(
             'interpret = richmetas.interpret:cli',
             'serve = richmetas.serve:serve',
             'stark = richmetas.stark_key:cli',
+            'ether_monitor = richmetas.ether_monitor:cli',
         ],
     },
 )

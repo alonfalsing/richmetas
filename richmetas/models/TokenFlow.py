@@ -1,14 +1,14 @@
 from enum import Enum
 
 from marshmallow import Schema, fields
-from sqlalchemy import Column, Integer, Numeric, String, ForeignKey
+from sqlalchemy import Column, Integer, Numeric, Boolean, String, ForeignKey
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 from web3 import Web3
 
-from .Account import AccountSchema
 from .Base import Base
 from .BigNumber import BigNumber
+from .EthEvent import EthEventSchema
 from .Token import TokenSchema
 from .Transaction import TransactionSchema
 
@@ -30,7 +30,9 @@ class TokenFlow(Base):
     from_account_id = Column(Integer, ForeignKey('account.id'))
     to_account_id = Column(Integer, ForeignKey('account.id'))
     _address = Column(String)
+    mint = Column(Boolean)
     nonce = Column(Numeric(precision=80))
+    event_id = Column(Integer, ForeignKey('eth_event.id'), unique=True)
 
     @hybrid_property
     def address(self):
@@ -44,6 +46,7 @@ class TokenFlow(Base):
     token = relationship('Token', back_populates='flows')
     from_account = relationship('Account', foreign_keys=from_account_id)
     to_account = relationship('Account', foreign_keys=to_account_id)
+    event = relationship('EthEvent')
 
 
 class TokenFlowSchema(Schema):
@@ -52,3 +55,4 @@ class TokenFlowSchema(Schema):
     token = fields.Nested(TokenSchema())
     address = fields.String()
     nonce = BigNumber()
+    receipt = fields.Nested(EthEventSchema(), attribute='event')

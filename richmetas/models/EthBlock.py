@@ -1,23 +1,21 @@
 from marshmallow import Schema, fields
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship
 
 from .Base import Base
 
 
-class Block(Base):
-    __tablename__ = 'block'
+class EthBlock(Base):
+    __tablename__ = 'eth_block'
 
-    id = Column(Integer, primary_key=True, autoincrement=False)
+    id = Column(Integer, primary_key=True)
     hash = Column(String, unique=True, nullable=False)
     timestamp = Column(DateTime(timezone=True), nullable=False)
-    _document = Column(JSON, nullable=False)
 
-    transactions = relationship('Transaction', back_populates='block')
+    events = relationship('EthEvent', back_populates='block')
 
 
-class BlockSchema(Schema):
+class EthBlockSchema(Schema):
     number = fields.Integer(attribute='id')
     hash = fields.String()
     timestamp = fields.DateTime()

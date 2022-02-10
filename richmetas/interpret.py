@@ -107,6 +107,10 @@ class RichmetasInterpreter:
         token = await self.lift_token(amount_or_token_id, contract)
         if token:
             assert token.owner == account
+            for receipt in tx.block._document['transaction_receipts']:
+                if receipt['transaction_hash'] == tx.hash:
+                    break
+
             flow = TokenFlow(
                 transaction=tx,
                 type=FlowType.WITHDRAWAL.value,
@@ -114,6 +118,7 @@ class RichmetasInterpreter:
                 from_account=token.owner,
                 address=to_checksum_address(address),
                 nonce=parse_int(nonce),
+                mint=receipt['l2_to_l1_messages'][0]['payload'][4] == '1',
             )
             self.session.add(flow)
 

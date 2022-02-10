@@ -627,7 +627,7 @@ async def find_withdrawals(request: Request):
 
     async with request.config_dict['async_session']() as session:
         from richmetas.models import Transaction, Withdrawal, WithdrawalSchema, Balance, \
-            TokenFlow, TokenFlowSchema, FlowType, TokenContract, Token, Account
+            TokenFlow, TokenFlowSchema, FlowType, TokenContract, Token, Account, EthEvent
 
         def augment(stmt):
             a1 = aliased(Account)
@@ -673,9 +673,15 @@ async def find_withdrawals(request: Request):
                         selectinload(Transaction.withdrawal).
                         selectinload(Withdrawal.balance).
                         selectinload(Balance.contract),
+                        selectinload(Transaction.withdrawal).
+                        selectinload(Withdrawal.event).
+                        selectinload(EthEvent.block),
                         selectinload(Transaction.token_flow).
                         selectinload(TokenFlow.token).
-                        selectinload(Token.contract)))).scalars()
+                        selectinload(Token.contract),
+                        selectinload(Transaction.token_flow).
+                        selectinload(TokenFlow.event).
+                        selectinload(EthEvent.block)))).scalars()
             ],
             'total': (await session.execute(count)).scalar_one(),
         })
