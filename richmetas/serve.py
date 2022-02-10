@@ -688,6 +688,50 @@ async def find_withdrawals(request: Request):
 
 
 @operations.register
+async def find_mints(request: Request):
+    with openapi_context(request) as context:
+        user = utils.to_checksum_address(context.parameters.query.get('user'))
+        contract = context.parameters.query.get('contract')
+        page = context.parameters.query.get('page', 1)
+        size = context.parameters.query.get('size', 100)
+
+    async with request.config_dict['async_session']() as session:
+        from richmetas.models import Transaction, TokenFlow, TokenFlowSchema, FlowType, TokenContract, Token, Account
+
+        def augment(stmt):
+            stmt = stmt.join(TokenFlow.to_account). \
+                where(TokenFlow.type == FlowType.MINT.value). \
+                where(Account.address == user)
+            if contract:
+                address = utils.to_checksum_address(contract)
+                stmt = stmt.join(TokenFlow.token). \
+                    join(Token.contract). \
+                    where(TokenContract.address == address)
+
+            return stmt
+
+        query = augment(select(TokenFlow)). \
+            join(TokenFlow.transaction). \
+            order_by(desc(Transaction.block_number)). \
+            order_by(desc(Transaction.transaction_index)). \
+            limit(size). \
+            offset(size * (page - 1))
+        count = augment(select(functions.count()).select_from(TokenFlow))
+
+        return web.json_response({
+            'data': list(map(
+                TokenFlowSchema().dump,
+                (await session.execute(
+                    query.options(
+                        selectinload(TokenFlow.transaction).
+                        selectinload(Transaction.block),
+                        selectinload(TokenFlow.token).
+                        selectinload(Token.contract)))).scalars())),
+            'total': (await session.execute(count)).scalar_one(),
+        })
+
+
+@operations.register
 async def find_orders(request: Request):
     with openapi_context(request) as context:
         q = context.parameters.query.get('q')
@@ -734,6 +778,8 @@ async def find_orders(request: Request):
                 order_by(Transaction.transaction_index if asc else desc(Transaction.transaction_index))
 
         count = augment(select(functions.count()).select_from(LimitOrder))
+        tx = aliased(Transaction)
+        tx2 = aliased(Transaction)
 
         return web.json_response({
             'data': list(map(
@@ -746,8 +792,10 @@ async def find_orders(request: Request):
                         selectinload(TokenContract.blueprint),
                         selectinload(LimitOrder.quote_contract).
                         selectinload(TokenContract.blueprint),
-                        selectinload(LimitOrder.tx).
-                        selectinload(Transaction.block)))).scalars())),
+                        selectinload(LimitOrder.tx.of_type(tx)).
+                        selectinload(tx.block),
+                        selectinload(LimitOrder.closed_tx.of_type(tx2)).
+                        selectinload(tx2.block)))).scalars())),
             'total': (await session.execute(count)).scalar_one(),
         })
 

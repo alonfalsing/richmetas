@@ -59,6 +59,7 @@ components:
         block:
           $ref: '#/components/schemas/Block'
       required: [hash, block]
+      nullable: true
 
     EtherBlock:
       type: object
@@ -245,6 +246,8 @@ components:
             token:
               $ref: '#/components/schemas/Token'
             tx:
+              $ref: '#/components/schemas/Transaction'
+            closed_tx:
               $ref: '#/components/schemas/Transaction'
           required: [user, token]
 
@@ -1050,6 +1053,45 @@ paths:
                       oneOf:
                         - $ref: '#/components/schemas/Withdrawal'
                         - $ref: '#/components/schemas/TokenFlow'
+
+  /mints:
+    get:
+      operationId: find_mints
+      summary: Find mints
+      description: Find mints by user or so.
+      tags: [token]
+      parameters:
+        - name: user
+          in: query
+          required: true
+          description: Stark key
+          schema:
+            type: string
+        - name: contract
+          in: query
+          description: Token contract address
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: size
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TokenFlow'
 
   /orders:
     get:
