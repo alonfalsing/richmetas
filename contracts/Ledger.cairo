@@ -6,9 +6,7 @@ from starkware.cairo.common.math import assert_nn
 from starkware.starknet.common.messages import send_message_to_l1
 from admin import get_admin, change_admin
 from acl import get_access, toggle_access, acl_secure
-
-const KIND_ERC20 = 1
-const KIND_ERC721 = 2
+from LedgerInterface import KIND_ERC20, KIND_ERC721
 
 const WITHDRAW = 0
 
@@ -173,7 +171,7 @@ end
 @external
 func transfer{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        from_ : felt, to_ : felt, amount_or_token_id : felt, contract : felt, nonce : felt):
+        from_ : felt, to_ : felt, amount_or_token_id : felt, contract : felt):
     acl_secure()
     assert_nn(amount_or_token_id)
 
@@ -203,7 +201,7 @@ end
 @external
 func mint{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt, token_id : felt, contract : felt, nonce : felt):
+        user : felt, token_id : felt, contract : felt):
     acl_secure()
     assert_nn(token_id)
 

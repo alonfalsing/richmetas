@@ -5,8 +5,8 @@ from starkware.cairo.common.registers import get_fp_and_pc
 from acl import get_access, toggle_access, acl_secure
 from admin import get_admin, change_admin
 from facade import get_underpinning, underpin_with
-from lib import authenticate_r
-from LedgerInterface import LedgerInterface
+from lib import authenticate_r, authenticate_2r, authenticate_6r
+from ExchangeInterface import ExchangeInterface
 
 @constructor
 func constructor{
@@ -19,59 +19,50 @@ func constructor{
 end
 
 @external
-func withdraw{
+func create_order{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt, amount_or_token_id : felt, contract : felt, address : felt, nonce : felt):
-    let (__fp__, _) = get_fp_and_pc()
-    authenticate_r(user, 4, &amount_or_token_id)
+        id : felt, user : felt, bid : felt,
+        base_contract : felt, base_token_id : felt,
+        quote_contract : felt, quote_amount : felt):
+    authenticate_6r(user, id, bid, base_contract, base_token_id, quote_contract, quote_amount)
 
     let (underpinning) = get_underpinning()
-    LedgerInterface.withdraw(
+    ExchangeInterface.create_order(
         contract_address=underpinning,
+        id=id,
         user=user,
-        amount_or_token_id=amount_or_token_id,
-        contract=contract,
-        address=address,
-        nonce=nonce)
+        bid=bid,
+        base_contract=base_contract,
+        base_token_id=base_token_id,
+        quote_contract=quote_contract,
+        quote_amount=quote_amount)
 
     return ()
 end
 
 @external
-func transfer{
+func fulfill_order{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        from_ : felt, to_ : felt, amount_or_token_id : felt, contract : felt, nonce : felt):
-    let (__fp__, _) = get_fp_and_pc()
-    authenticate_r(from_, 4, &to_)
+        id : felt, user : felt, nonce : felt):
+    authenticate_2r(user, id, nonce)
 
     let (underpinning) = get_underpinning()
-    LedgerInterface.transfer(
-        contract_address=underpinning,
-        from_=from_,
-        to_=to_,
-        amount_or_token_id=amount_or_token_id,
-        contract=contract)
+    ExchangeInterface.fulfill_order(contract_address=underpinning, id=id, user=user)
 
     return ()
 end
 
 @external
-func mint{
+func cancel_order{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt, token_id : felt, contract : felt, nonce : felt):
+        id : felt, nonce : felt):
     alloc_locals
-
     let (local underpinning) = get_underpinning()
-    let (desc) = LedgerInterface.describe(contract_address=underpinning, contract=contract)
+    let (order) = ExchangeInterface.get_order(contract_address=underpinning, id=id)
 
     let (__fp__, _) = get_fp_and_pc()
-    authenticate_r(desc.mint, 4, &user)
-
-    LedgerInterface.mint(
-        contract_address=underpinning,
-        user=user,
-        token_id=token_id,
-        contract=contract)
+    authenticate_r(order.user, 2, &id)
+    ExchangeInterface.cancel_order(contract_address=underpinning, id=id)
 
     return ()
 end

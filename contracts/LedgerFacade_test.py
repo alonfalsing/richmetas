@@ -16,7 +16,7 @@ patch_starknet()
 
 
 @pytest.mark.asyncio
-async def test_deposit():
+async def test_withdraw():
     k = StarkKeyPair()
     a = int(Account.create().address, 0)
     starknet = await Starknet.empty()
@@ -112,7 +112,7 @@ async def test_transfer():
     calldata = [k.stark_key, sk, 5050, 0, uuid4().int]
     signature = k.sign(*calldata[1:], hash_algo=hash_message_r)
     with pytest.raises(StarkException):
-        await ledger_contract.transfer(*calldata).invoke(signature=[*signature])
+        await ledger_contract.transfer(*calldata[:-1]).invoke()
     with pytest.raises(StarkException):
         await facade_contract.transfer(*calldata).invoke(signature=[*signature])
 
@@ -188,7 +188,7 @@ async def test_mint():
     calldata = [k2.stark_key, uuid4().int, ERC721_CONTRACT_ADDRESS, uuid4().int]
     signature = k.sign(*calldata, hash_algo=hash_message_r)
     with pytest.raises(StarkException):
-        await ledger_contract.mint(*calldata).invoke(signature=[*signature])
+        await ledger_contract.mint(*calldata[:-1]).invoke()
 
     with pytest.raises(StarkException):
         await facade_contract.mint(*calldata).invoke(signature=[*signature])

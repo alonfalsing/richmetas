@@ -3,6 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.hash_state import hash_init, hash_update, hash_finalize
+from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.starknet.common.syscalls import get_tx_signature
 
@@ -49,6 +50,24 @@ func authenticate_r{
         public_key=user,
         signature_r=sig[0],
         signature_s=sig[1])
+
+    return ()
+end
+
+func authenticate_2r{
+        syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        user : felt, a : felt, b : felt):
+    let (__fp__, _) = get_fp_and_pc()
+    authenticate_r(user, 2, &a)
+
+    return ()
+end
+
+func authenticate_6r{
+        syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        user : felt, a : felt, b : felt, c : felt, d : felt, e : felt, f : felt):
+    let (__fp__, _) = get_fp_and_pc()
+    authenticate_r(user, 6, &a)
 
     return ()
 end
