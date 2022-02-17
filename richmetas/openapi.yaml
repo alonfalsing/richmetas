@@ -974,7 +974,7 @@ paths:
         - name: user
           in: query
           required: true
-          description: Stark key
+          description: Ethereum address
           schema:
             type: string
         - name: contract

@@ -9,7 +9,9 @@ from eth_account.hdaccount.deterministic import HDPath, SECP256K1_N
 from eth_account.messages import encode_defunct
 from eth_account.signers.local import LocalAccount
 from starkware.crypto.signature.fast_pedersen_hash import pedersen_hash
-from starkware.crypto.signature.signature import EC_ORDER, private_to_stark_key, sign
+from starkware.crypto.signature.signature import EC_ORDER, private_to_stark_key, sign, get_random_private_key
+
+from richmetas.utils import parse_int
 
 
 def derive_stark_private_key(account: LocalAccount, layer: str, application: str, seed: bytes) -> int:
@@ -51,7 +53,7 @@ def cli():
 
 @cli.command('rand')
 def seed():
-    print(int.from_bytes(os.urandom(32), byteorder='big') % EC_ORDER)
+    print(get_random_private_key())
 
 
 @cli.command('tell')
@@ -76,11 +78,12 @@ def derive_stark_key(layer, application, private_key, seed):
 
 
 @cli.command('sign')
+@click.option('--alter', is_flag=True)
 @click.argument('private_key', type=int)
 @click.argument('inputs', nargs=-1, required=False)
-def sign_stark_inputs(private_key: int, inputs: [str]):
-    message_hash = functools.reduce(
-        lambda x, y: pedersen_hash(y, x),
-        reversed([int(x, 16) if x.startswith('0x') else int(x) for x in inputs]), 0)
+def sign_stark_inputs(private_key: int, inputs: [str], alter):
+    inputs = [parse_int(i) for i in inputs]
+    message_hash = pedersen_hash(functools.reduce(pedersen_hash, inputs, 0), len(inputs)) if alter else \
+        functools.reduce(lambda x, y: pedersen_hash(y, x), reversed(inputs), 0)
     print(message_hash)
     print(sign(msg_hash=message_hash, priv_key=private_key))
