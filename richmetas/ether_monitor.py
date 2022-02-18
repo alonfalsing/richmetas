@@ -52,6 +52,7 @@ class Monitor:
         await self.persist(f.get_all_entries())
         while True:
             await self.persist(f.get_new_entries())
+            await asyncio.sleep(15)
 
     async def persist(self, events):
         for e in events:
