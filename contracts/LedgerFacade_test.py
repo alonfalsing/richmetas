@@ -47,6 +47,8 @@ async def test_withdraw():
         ledger_contract.contract_address,
         L1_CONTRACT_ADDRESS,
         [0, a, calldata[1], 0, 0, calldata[4]])
+    exec_info = await ledger_contract.get_balance(k.stark_key, 0).call()
+    assert exec_info.result == (0,)
 
     await starknet.send_message_to_l2(
         L1_CONTRACT_ADDRESS,
@@ -65,6 +67,8 @@ async def test_withdraw():
         ledger_contract.contract_address,
         L1_CONTRACT_ADDRESS,
         [0, a, calldata[1], ERC20_CONTRACT_ADDRESS, 0, calldata[4]])
+    exec_info = await ledger_contract.get_balance(k.stark_key, ERC20_CONTRACT_ADDRESS).call()
+    assert exec_info.result == (18080,)
     calldata = [k.stark_key, 23130, ERC20_CONTRACT_ADDRESS, a, uuid4().int]
     signature = k.sign(*calldata[1:], hash_algo=hash_message_r)
     with pytest.raises(StarkException):
@@ -87,6 +91,8 @@ async def test_withdraw():
         ledger_contract.contract_address,
         L1_CONTRACT_ADDRESS,
         [0, a, calldata[1], ERC721_CONTRACT_ADDRESS, 0, calldata[4]])
+    exec_info = await ledger_contract.get_owner(21930, ERC721_CONTRACT_ADDRESS).call()
+    assert exec_info.result == (0,)
     calldata = [k.stark_key, 5050, ERC721_CONTRACT_ADDRESS, a, uuid4().int]
     signature = k.sign(*calldata[1:], hash_algo=hash_message_r)
     with pytest.raises(StarkException):

@@ -1,5 +1,6 @@
 import os
 
+from starkware.starknet.testing.contract import StarknetContract, StarknetContractFunctionInvocation
 from starkware.starknet.testing.starknet import Starknet
 
 
@@ -11,5 +12,13 @@ async def deploy(starknet: Starknet, name: str, *constructor_calldata):
     )
 
 
+def proxy(f: StarknetContractFunctionInvocation, proxy_contract: StarknetContract):
+    f.state = proxy_contract.state
+    f.contract_address = proxy_contract.contract_address
+
+    return f
+
+
 def patch_starknet():
     Starknet.deploy_source = deploy
+    StarknetContractFunctionInvocation.proxy = proxy

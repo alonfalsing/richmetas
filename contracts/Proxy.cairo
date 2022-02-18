@@ -15,27 +15,42 @@ end
 @constructor
 func constructor{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        administrator : felt):
+        implementation : felt, administrator : felt):
+    _Proxy_implementation.write(implementation)
     _Proxy_administrator.write(administrator)
 
     return ()
+end
+
+@view
+func getAdmin{
+        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+        administrator : felt):
+    return _Proxy_administrator.read()
 end
 
 @external
 func changeAdmin{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         administrator : felt):
-    only_administrator()
+    onlyAdmin()
     _Proxy_administrator.write(administrator)
 
     return ()
+end
+
+@view
+func getImplementation{
+        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+        implementation : felt):
+    return _Proxy_implementation.read()
 end
 
 @external
 func upgradeTo{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         implementation : felt):
-    only_administrator()
+    onlyAdmin()
     _Proxy_implementation.write(implementation)
 
     return ()
@@ -70,7 +85,7 @@ func __l1_default__{
     return ()
 end
 
-func only_administrator{
+func onlyAdmin{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
     let (address) = get_caller_address()
     let (administrator) = _Proxy_administrator.read()

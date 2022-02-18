@@ -39,9 +39,22 @@ end
 func constructor{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         l1_contract : felt, admin : felt):
-    _l1_contract.write(value=l1_contract)
+    initialize(l1_contract)
     change_admin(admin)
 
+    return ()
+end
+
+@external
+func initialize{
+        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        l1_contract : felt):
+    let (address) = _l1_contract.read()
+    if address != 0:
+        return ()
+    end
+
+    _l1_contract.write(value=l1_contract)
     _description.write(0, ContractDescription(
         kind=KIND_ERC20,
         mint=0))
