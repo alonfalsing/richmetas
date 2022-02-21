@@ -27,7 +27,7 @@ func constructor{
 end
 
 @view
-func owner{
+func get_owner{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
         user : felt):
     return _owner.read()

@@ -16,7 +16,7 @@ async def test_change_owner():
     await facade_admin_contract. \
         change_owner(sk). \
         invoke(signature=[*k.sign(sk)])
-    exec_info = await facade_admin_contract.owner().call()
+    exec_info = await facade_admin_contract.get_owner().call()
     assert exec_info.result == (sk,)
 
 

@@ -1,5 +1,6 @@
 import os
 
+from starkware.starknet.business_logic.state import BlockInfo
 from starkware.starknet.testing.contract import StarknetContract, StarknetContractFunctionInvocation
 from starkware.starknet.testing.starknet import Starknet
 
@@ -19,6 +20,13 @@ def proxy(f: StarknetContractFunctionInvocation, proxy_contract: StarknetContrac
     return f
 
 
+def set_block_timestamp(starknet: Starknet, block_timestamp: int):
+    starknet.state.state.block_info = BlockInfo(
+        block_number=starknet.state.state.block_info.block_number,
+        block_timestamp=block_timestamp)
+
+
 def patch_starknet():
     Starknet.deploy_source = deploy
+    Starknet.set_timestamp = set_block_timestamp
     StarknetContractFunctionInvocation.proxy = proxy

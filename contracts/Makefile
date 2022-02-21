@@ -7,6 +7,9 @@ SOURCES = \
 	LedgerFacade.cairo \
 	Exchange.cairo \
 	ExchangeFacade.cairo \
+	Staking.cairo \
+	StakingFacade.cairo \
+	StakingFacadeAdmin.cairo \
 	Proxy.cairo \
 	ProxyAdmin.cairo
 OUTPUTS = $(patsubst %.cairo,$(OUTPUT_DIR)/%_compiled.json,$(SOURCES))
@@ -27,7 +30,7 @@ build/%.d: %.cairo
 all: $(OUTPUTS) $(ABIS)
 
 test:
-	pytest
+	pytest -x
 
 clean:
 	@rm -fv $(OUTPUT_DIR)/*

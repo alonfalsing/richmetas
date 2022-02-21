@@ -2,7 +2,6 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.registers import get_fp_and_pc
-from acl import get_access, toggle_access, acl_secure
 from admin import get_admin, change_admin
 from facade import get_underpinning, underpin_with
 from lib import authenticate_r, authenticate_2r, authenticate_6r

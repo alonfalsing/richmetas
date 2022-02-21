@@ -27,9 +27,22 @@ end
 func constructor{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         ledger : felt, admin : felt):
-    _ledger.write(ledger)
+    initialize(ledger)
     change_admin(admin)
 
+    return ()
+end
+
+@external
+func initialize{
+        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        ledger : felt):
+    let (address) = _ledger.read()
+    if address != 0:
+        return ()
+    end
+
+    _ledger.write(ledger)
     return ()
 end
 

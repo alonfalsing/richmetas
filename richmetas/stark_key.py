@@ -1,5 +1,4 @@
 import functools
-import os
 from hashlib import sha256
 from struct import pack
 
