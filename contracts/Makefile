@@ -3,6 +3,9 @@ OUTPUT_DIR ?= build
 SOURCES = \
 	AccessControl.cairo \
 	FacadeAdmin.cairo \
+	Login.cairo \
+	LoginFacade.cairo \
+	LoginFacadeAdmin.cairo \
 	Ledger.cairo \
 	LedgerFacade.cairo \
 	Exchange.cairo \
