@@ -1,6 +1,6 @@
 OUTPUT_DIR ?= build
 
-SOURCES = \
+SOURCES	= \
 	AccessControl.cairo \
 	FacadeAdmin.cairo \
 	Login.cairo \
@@ -14,9 +14,17 @@ SOURCES = \
 	StakingFacade.cairo \
 	StakingFacadeAdmin.cairo \
 	Proxy.cairo \
-	ProxyAdmin.cairo
-OUTPUTS = $(patsubst %.cairo,$(OUTPUT_DIR)/%_compiled.json,$(SOURCES))
-ABIS = $(patsubst %.cairo,$(OUTPUT_DIR)/%_abi.json,$(SOURCES))
+	ProxyAdmin.cairo \
+	Richmetas.sol \
+	RichmetasForwarder.sol \
+	ERC721PresetMinter.sol
+OUTPUTS	= $(patsubst %.sol,$(OUTPUT_DIR)/%.bin, \
+	$(patsubst %.cairo,$(OUTPUT_DIR)/%_compiled.json,$(SOURCES)))
+ABIS 	= $(patsubst %.sol,$(OUTPUT_DIR)/%.abi, \
+	$(patsubst %.cairo,$(OUTPUT_DIR)/%_abi.json,$(SOURCES)))
+
+build/%.abi build/%.bin: %.sol
+	solc --abi --bin -o build $< --base-path . --include-path node_modules --overwrite
 
 build/%_compiled.json build/%_abi.json: %.cairo
 	starknet-compile $< \
@@ -40,4 +48,4 @@ clean:
 
 .PHONY: all test clean
 
-include $(patsubst %.cairo,$(OUTPUT_DIR)/%.d,$(SOURCES))
+include $(patsubst %.cairo,$(OUTPUT_DIR)/%.d,$(filter %.cairo,$(SOURCES)))

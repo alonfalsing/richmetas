@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from starkware.starknet.testing.starknet import Starknet
 
@@ -13,9 +15,9 @@ async def test_change_owner():
     k, sk = StarkKeyPair(), StarkKeyPair().stark_key
     starknet = await Starknet.empty()
     access_control_contract = await starknet.deploy_source('AccessControl', k.stark_key)
-    await access_control_contract. \
-        change_owner(sk). \
-        invoke(signature=[*k.sign(sk)])
+    calldata = [sk, uuid4().int]
+    signature = k.sign(*calldata)
+    await access_control_contract.change_owner(*calldata).invoke(signature=[*signature])
     exec_info = await access_control_contract.get_owner().call()
     assert exec_info.result == (sk,)
 
@@ -30,8 +32,8 @@ async def test_acl_toggle_access():
     facade_admin_contract = await starknet.deploy_source('FacadeAdmin', k.stark_key)
     facade_contract = await starknet.deploy_source(
         'LedgerFacade', ledger_contract.contract_address, facade_admin_contract.contract_address)
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, facade_contract.contract_address, 1)])
+    calldata = [ledger_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    signature = k.sign(*calldata)
+    await access_control_contract.acl_toggle_access(*calldata).invoke(signature=[*signature])
     exec_info = await ledger_contract.get_access(facade_contract.contract_address).call()
     assert exec_info.result == (1,)

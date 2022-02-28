@@ -36,11 +36,11 @@ end
 @external
 func changeOwner{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt):
+        user : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 1, &user)
+    authenticate(owner, 2, &user)
     _owner.write(user)
 
     return ()
@@ -49,11 +49,11 @@ end
 @external
 func changeProxyAdmin{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        proxy : felt, administrator : felt):
+        proxy : felt, administrator : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 2, &proxy)
+    authenticate(owner, 3, &proxy)
     UpgradeableProxy.changeAdmin(contract_address=proxy, administrator=administrator)
 
     return ()
@@ -62,11 +62,11 @@ end
 @external
 func upgrade{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        proxy : felt, implementation : felt):
+        proxy : felt, implementation : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 2, &proxy)
+    authenticate(owner, 3, &proxy)
     UpgradeableProxy.upgradeTo(contract_address=proxy, implementation=implementation)
 
     return ()

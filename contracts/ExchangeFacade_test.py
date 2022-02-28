@@ -44,12 +44,12 @@ async def test_create():
     with pytest.raises(StarkException):
         await facade_contract.create_order(*calldata).invoke(signature=[*signature])
 
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, exchange_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, exchange_contract.contract_address, 1)])
-    await access_control_contract. \
-        acl_toggle_access(exchange_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(exchange_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, exchange_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
+    ac_calldata = [exchange_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_contract.create_order(*calldata).invoke(signature=[*signature])
     exec_info = await exchange_contract.get_order(calldata[0]).call()
     assert exec_info.result == (tuple([*calldata[1:], 0]),)
@@ -70,14 +70,15 @@ async def test_fulfill():
     facade_contract = await starknet.deploy_source(
         'ExchangeFacade', exchange_contract.contract_address, facade_admin_contract.contract_address)
 
+    ac_calldata = [ledger_contract.contract_address, exchange_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
+    ac_calldata = [exchange_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
+
     calldata = [uuid4().int, k2.stark_key, 0, ERC721_CONTRACT_ADDRESS, uuid4().int, 0, 5000]
     signature = k2.sign(calldata[0], *calldata[2:], hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, exchange_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, exchange_contract.contract_address, 1)])
-    await access_control_contract. \
-        acl_toggle_access(exchange_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(exchange_contract.contract_address, facade_contract.contract_address, 1)])
     await starknet.send_message_to_l2(
         L1_CONTRACT_ADDRESS,
         ledger_contract.contract_address,
@@ -122,14 +123,15 @@ async def test_cancel():
     facade_contract = await starknet.deploy_source(
         'ExchangeFacade', exchange_contract.contract_address, facade_admin_contract.contract_address)
 
+    ac_calldata = [ledger_contract.contract_address, exchange_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
+    ac_calldata = [exchange_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
+
     calldata = [uuid4().int, k.stark_key, 0, ERC721_CONTRACT_ADDRESS, uuid4().int, 0, 5000]
     signature = k.sign(calldata[0], *calldata[2:], hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, exchange_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, exchange_contract.contract_address, 1)])
-    await access_control_contract. \
-        acl_toggle_access(exchange_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(exchange_contract.contract_address, facade_contract.contract_address, 1)])
     await starknet.send_message_to_l2(
         L1_CONTRACT_ADDRESS,
         ledger_contract.contract_address,

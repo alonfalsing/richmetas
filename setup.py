@@ -15,6 +15,7 @@ setup(
         'asyncpg',
         'cairo-lang',
         'click',
+        'dependency_injector',
         'ethereum',
         'jsonschema',
         'marshmallow',

@@ -36,11 +36,11 @@ end
 @external
 func change_owner{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt):
+        user : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 1, &user)
+    authenticate(owner, 2, &user)
     _owner.write(user)
 
     return ()
@@ -49,11 +49,11 @@ end
 @external
 func acl_change_admin{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        contract : felt, user : felt):
+        contract : felt, user : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 2, &contract)
+    authenticate(owner, 3, &contract)
     ACL.change_admin(contract_address=contract, user=user)
 
     return ()
@@ -62,11 +62,11 @@ end
 @external
 func acl_toggle_access{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        contract : felt, friend_contract : felt, allowed : felt):
+        contract : felt, friend_contract : felt, allowed : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 3, &contract)
+    authenticate(owner, 4, &contract)
     ACL.toggle_access(contract_address=contract, contract=friend_contract, allowed=allowed)
 
     return ()

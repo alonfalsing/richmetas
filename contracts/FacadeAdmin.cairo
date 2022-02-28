@@ -36,11 +36,11 @@ end
 @external
 func change_owner{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt):
+        user : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 1, &user)
+    authenticate(owner, 2, &user)
     _owner.write(user)
 
     return ()
@@ -49,11 +49,11 @@ end
 @external
 func facade_change_admin{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        contract : felt, user : felt):
+        contract : felt, user : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 2, &contract)
+    authenticate(owner, 3, &contract)
     Facade.change_admin(contract_address=contract, user=user)
 
     return ()
@@ -62,11 +62,11 @@ end
 @external
 func facade_underpin{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        contract : felt, underpinning : felt):
+        contract : felt, underpinning : felt, nonce : felt):
     let (owner) = _owner.read()
     let (__fp__, _) = get_fp_and_pc()
 
-    authenticate(owner, 2, &contract)
+    authenticate(owner, 3, &contract)
     Facade.underpin_with(contract_address=contract, underpinning=underpinning)
 
     return ()

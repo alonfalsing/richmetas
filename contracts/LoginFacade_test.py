@@ -23,7 +23,7 @@ async def test_register_account():
         'LoginFacade', login_contract.contract_address, facade_admin_contract.contract_address)
 
     calldata = [facade_contract.contract_address, k2.stark_key, a, uuid4().int]
-    signature = k.sign(*calldata, hash_algo=hash_message_r)
+    signature = k.sign(*calldata)
     with pytest.raises(StarkException):
         await login_contract.register_account(*calldata[1:-1]).invoke()
     with pytest.raises(StarkException):
@@ -31,9 +31,9 @@ async def test_register_account():
     with pytest.raises(StarkException):
         await facade_admin_contract.register_account(*calldata).invoke(signature=[*signature])
 
-    await access_control_contract. \
-        acl_toggle_access(login_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(login_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [login_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_admin_contract.register_account(*calldata).invoke(signature=[*signature])
     exec_info = await login_contract.get_account(a).call()
     assert exec_info.result == (k2.stark_key,)

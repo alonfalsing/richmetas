@@ -47,9 +47,9 @@ async def test_set_revenue():
     with pytest.raises(StarkException):
         await facade_admin_contract.set_revenue(*calldata).invoke(signature=[*signature])
 
-    await access_control_contract. \
-        acl_toggle_access(staking_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(staking_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [staking_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     with pytest.raises(StarkException):
         await facade_contract.set_revenue(*calldata[1:-1]).invoke()
     await facade_admin_contract.set_revenue(*calldata).invoke(signature=[*signature])
@@ -88,15 +88,15 @@ async def test_stake_non_fungible():
 
     calldata = [facade_contract.contract_address, ERC721_CONTRACT_ADDRESS, 5050, ERC20_CONTRACT_ADDRESS, k.stark_key, uuid4().int]
     signature = k.sign(*calldata, hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(staking_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(staking_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [staking_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_admin_contract.set_revenue(*calldata).invoke(signature=[*signature])
     calldata = [uuid4().int, k2.stark_key, token_id, ERC721_CONTRACT_ADDRESS]
     signature = k2.sign(calldata[0], *calldata[2:], hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, staking_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, staking_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, staking_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
 
     started_at = int(time())
     starknet.set_timestamp(started_at)
@@ -137,15 +137,15 @@ async def test_unstake_fungible():
 
     calldata = [facade_contract.contract_address, 0, 200, ERC20_CONTRACT_ADDRESS, k.stark_key, uuid4().int]
     signature = k.sign(*calldata, hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(staking_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(staking_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [staking_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_admin_contract.set_revenue(*calldata).invoke(signature=[*signature])
     calldata = [uuid4().int, k2.stark_key, 500000, 0]
     signature = k2.sign(calldata[0], *calldata[2:], hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, staking_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, staking_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, staking_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     started_at = int(time())
     starknet.set_timestamp(started_at)
     await facade_contract.stake(*calldata).invoke(signature=[*signature])
@@ -195,15 +195,15 @@ async def test_unstake_fungible_compound():
 
     calldata = [facade_contract.contract_address, ERC20_CONTRACT_ADDRESS, 200, ERC20_CONTRACT_ADDRESS, k.stark_key, uuid4().int]
     signature = k.sign(*calldata, hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(staking_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(staking_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [staking_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_admin_contract.set_revenue(*calldata).invoke(signature=[*signature])
     calldata = [uuid4().int, k2.stark_key, 500000, ERC20_CONTRACT_ADDRESS]
     signature = k2.sign(calldata[0], *calldata[2:], hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, staking_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, staking_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, staking_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     started_at = int(time())
     starknet.set_timestamp(started_at)
     await facade_contract.stake(*calldata).invoke(signature=[*signature])
@@ -257,15 +257,15 @@ async def test_unstake_non_fungible():
 
     calldata = [facade_contract.contract_address, ERC721_CONTRACT_ADDRESS, 200, ERC20_CONTRACT_ADDRESS, k.stark_key, uuid4().int]
     signature = k.sign(*calldata, hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(staking_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(staking_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [staking_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_admin_contract.set_revenue(*calldata).invoke(signature=[*signature])
     calldata = [uuid4().int, k2.stark_key, token_id, ERC721_CONTRACT_ADDRESS]
     signature = k2.sign(calldata[0], *calldata[2:], hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, staking_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, staking_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, staking_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     started_at = int(time())
     starknet.set_timestamp(started_at)
     await facade_contract.stake(*calldata).invoke(signature=[*signature])

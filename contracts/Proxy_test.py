@@ -19,9 +19,9 @@ async def test_change_proxy_admin():
     proxy_admin_contract = await starknet.deploy_source('ProxyAdmin', k.stark_key)
     proxy_contract = await starknet.deploy_source(
         'Proxy', 0, proxy_admin_contract.contract_address)
-    await proxy_admin_contract. \
-        changeProxyAdmin(proxy_contract.contract_address, sk). \
-        invoke(signature=[*k.sign(proxy_contract.contract_address, sk)])
+    calldata = [proxy_contract.contract_address, sk, uuid4().int]
+    signature = k.sign(*calldata)
+    await proxy_admin_contract.changeProxyAdmin(*calldata).invoke(signature=[*signature])
     exec_info = await proxy_contract.getAdmin().call()
     assert exec_info.result == (sk,)
 
@@ -36,9 +36,9 @@ async def test_upgrade():
     proxy_admin_contract = await starknet.deploy_source('ProxyAdmin', k.stark_key)
     proxy_contract = await starknet.deploy_source(
         'Proxy', 0, proxy_admin_contract.contract_address)
-    await proxy_admin_contract. \
-        upgrade(proxy_contract.contract_address, ledger_contract.contract_address). \
-        invoke(signature=[*k.sign(proxy_contract.contract_address, ledger_contract.contract_address)])
+    calldata = [proxy_contract.contract_address, ledger_contract.contract_address, uuid4().int]
+    signature = k.sign(*calldata)
+    await proxy_admin_contract.upgrade(*calldata).invoke(signature=[*signature])
     exec_info = await proxy_contract.getImplementation().call()
     assert exec_info.result == (ledger_contract.contract_address,)
 
@@ -91,9 +91,9 @@ async def test_external():
 
     calldata = [k.stark_key, 5050, 0, a, uuid4().int]
     signature = k.sign(*calldata[1:], hash_algo=hash_message_r)
-    await access_control_contract. \
-        acl_toggle_access(proxy_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(proxy_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [proxy_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_contract.withdraw(*calldata).invoke(signature=[*signature])
     starknet.consume_message_from_l2(
         proxy_contract.contract_address,

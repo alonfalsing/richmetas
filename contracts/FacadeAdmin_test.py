@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from starkware.starknet.testing.starknet import Starknet
 
@@ -13,9 +15,9 @@ async def test_change_owner():
     k, sk = StarkKeyPair(), StarkKeyPair().stark_key
     starknet = await Starknet.empty()
     facade_admin_contract = await starknet.deploy_source('FacadeAdmin', k.stark_key)
-    await facade_admin_contract. \
-        change_owner(sk). \
-        invoke(signature=[*k.sign(sk)])
+    calldata = [sk, uuid4().int]
+    signature = k.sign(*calldata)
+    await facade_admin_contract.change_owner(*calldata).invoke(signature=[*signature])
     exec_info = await facade_admin_contract.get_owner().call()
     assert exec_info.result == (sk,)
 
@@ -32,8 +34,8 @@ async def test_facade_underpin():
     facade_admin_contract = await starknet.deploy_source('FacadeAdmin', k.stark_key)
     facade_contract = await starknet.deploy_source(
         'LedgerFacade', ledger_contract.contract_address, facade_admin_contract.contract_address)
-    await facade_admin_contract. \
-        facade_underpin(facade_contract.contract_address, ledger_contract2.contract_address). \
-        invoke(signature=[*k.sign(facade_contract.contract_address, ledger_contract2.contract_address)])
+    calldata = [facade_contract.contract_address, ledger_contract2.contract_address, uuid4().int]
+    signature = k.sign(*calldata)
+    await facade_admin_contract.facade_underpin(*calldata).invoke(signature=[*signature])
     exec_info = await facade_contract.get_underpinning().call()
     assert exec_info.result == (ledger_contract2.contract_address,)

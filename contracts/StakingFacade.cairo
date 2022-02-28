@@ -4,7 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.registers import get_fp_and_pc
 from admin import get_admin, change_admin, only_admin
 from facade import get_underpinning, underpin_with
-from lib import authenticate_2r, authenticate_3r
+from lib import authenticate_r, authenticate_3r
 from StakingInterface import StakingInterface
 
 @constructor
@@ -58,7 +58,8 @@ func unstake{
     alloc_locals
     let (local underpinning) = get_underpinning()
     let (staking) = StakingInterface.get_staking(contract_address=underpinning, id=id)
-    authenticate_2r(staking.user, id, nonce)
+    let (__fp__, _) = get_fp_and_pc()
+    authenticate_r(staking.user, 2, &id)
 
     StakingInterface.unstake(contract_address=underpinning, id=id)
 

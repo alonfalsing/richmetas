@@ -39,9 +39,9 @@ async def test_withdraw():
     with pytest.raises(StarkException):
         await facade_contract.withdraw(*calldata).invoke(signature=[*signature])
 
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_contract.withdraw(*calldata).invoke(signature=[*signature])
     starknet.consume_message_from_l2(
         ledger_contract.contract_address,
@@ -122,9 +122,9 @@ async def test_transfer():
     with pytest.raises(StarkException):
         await facade_contract.transfer(*calldata).invoke(signature=[*signature])
 
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_contract.transfer(*calldata).invoke(signature=[*signature])
     exec_info = await ledger_contract.get_balance(sk, 0).call()
     assert exec_info.result == (5050,)
@@ -199,9 +199,9 @@ async def test_mint():
     with pytest.raises(StarkException):
         await facade_contract.mint(*calldata).invoke(signature=[*signature])
 
-    await access_control_contract. \
-        acl_toggle_access(ledger_contract.contract_address, facade_contract.contract_address, 1). \
-        invoke(signature=[*k.sign(ledger_contract.contract_address, facade_contract.contract_address, 1)])
+    ac_calldata = [ledger_contract.contract_address, facade_contract.contract_address, 1, uuid4().int]
+    ac_signature = k.sign(*ac_calldata)
+    await access_control_contract.acl_toggle_access(*ac_calldata).invoke(signature=[*ac_signature])
     await facade_contract.mint(*calldata).invoke(signature=[*signature])
     exec_info = await ledger_contract.get_owner(calldata[1], ERC721_CONTRACT_ADDRESS).call()
     assert exec_info.result == (k2.stark_key,)

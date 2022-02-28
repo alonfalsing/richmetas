@@ -72,15 +72,6 @@ func authenticate_3r{
     return ()
 end
 
-func authenticate_4r{
-        syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt, a : felt, b : felt, c : felt, d : felt):
-    let (__fp__, _) = get_fp_and_pc()
-    authenticate_r(user, 4, &a)
-
-    return ()
-end
-
 func authenticate_6r{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         user : felt, a : felt, b : felt, c : felt, d : felt, e : felt, f : felt):
