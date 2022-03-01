@@ -6,52 +6,65 @@ from urllib.parse import urljoin
 
 import aiohttp
 import click
-from decouple import config
-from sqlalchemy import select
+from dependency_injector.wiring import Provide, inject
+from sqlalchemy import select, update
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql import functions
 from web3 import Web3
 
-from richmetas.contracts import ERC20, ERC721Metadata, StarkRichmetas
+from richmetas.containers import Container, build_container
+from richmetas.contracts import ERC20, ERC721Metadata
+from richmetas.contracts.starknet import Facade as StarkRichmetas
+from richmetas.globals import async_session, feeder_gateway_client
 from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint, Transfer, \
     TokenFlow, FlowType, Withdrawal, Deposit
 from richmetas.models.LimitOrder import Side
 from richmetas.models.TokenContract import KIND_ERC721
 from richmetas.models.Transaction import Transaction, TYPE_DEPLOY
-from richmetas.globals import async_session, feeder_gateway_client, gateway_client
 from richmetas.services import TransferService
 from richmetas.utils import to_checksum_address, parse_int, ZERO_ADDRESS, Status
 
 
 class RichmetasInterpreter:
-    def __init__(self, session: AsyncSession, client: aiohttp.ClientSession, w3: Web3):
+    @inject
+    def __init__(
+            self,
+            session: AsyncSession,
+            client: aiohttp.ClientSession,
+            w3: Web3,
+            ledger_address: int = Provide[Container.config.ledger_address],
+            ledger_facade_address: int = Provide[Container.config.ledger_facade_address],
+            exchange_facade_address: int = Provide[Container.config.exchange_facade_address],
+            login_facade_admin_address: int = Provide[Container.config.login_facade_admin_address]):
+        from starkware.starknet.public.abi import get_selector_from_name
+
         self.session = session
         self.client = client
         self.w3 = w3
         self._transfer_service = TransferService(self.session)
-
-    async def exec(self, tx: Transaction):
-        from starkware.starknet.public.abi import get_selector_from_name
-
-        instructions = dict([
-            ('0x%x' % get_selector_from_name(f), self.__getattribute__(f))
-            for f in [
-                'register_contract',
-                'register_client',
-                'mint',
-                'withdraw',
-                'deposit',
-                'transfer',
-                'create_order',
-                'fulfill_order',
-                'cancel_order',
+        self._instructions = dict([
+            (hex(get_selector_from_name(f)), (hex(a), self.__getattribute__(f)))
+            for (a, f) in [
+                (ledger_address, 'register_contract'),
+                (login_facade_admin_address, 'register_account'),
+                (ledger_facade_address, 'mint'),
+                (ledger_facade_address, 'withdraw'),
+                (ledger_address, 'deposit'),
+                (ledger_facade_address, 'transfer'),
+                (exchange_facade_address, 'create_order'),
+                (exchange_facade_address, 'fulfill_order'),
+                (exchange_facade_address, 'cancel_order'),
             ]
         ])
-        try:
-            await instructions[tx.entry_point_selector](tx)
-        except KeyError:
-            pass
+
+    @inject
+    async def exec(self, tx: Transaction):
+        if tx.entry_point_selector in self._instructions:
+            a, f = self._instructions[tx.entry_point_selector]
+            assert a == tx.contract.address
+            await f(tx)
 
     async def register_contract(self, tx: Transaction):
         logging.warning(f'register_contract')
@@ -80,9 +93,9 @@ class RichmetasInterpreter:
                 blueprint=blueprint)
             self.session.add(self.lift_contract(token_contract))
 
-    async def register_client(self, tx: Transaction):
-        logging.warning(f'register_client')
-        user, address, _nonce = tx.calldata
+    async def register_account(self, tx: Transaction):
+        logging.warning(f'register_account')
+        _contract, user, address, _nonce = tx.calldata
         await self.lift_account(user, address)
 
     async def mint(self, tx: Transaction):
@@ -254,7 +267,6 @@ class RichmetasInterpreter:
             balance = await self._transfer_service.lift_balance(user, limit_order.quote_contract)
             balance.amount += limit_order.quote_amount
         else:
-            user = await self.lift_account(user)
             token.owner = user
             balance = await self._transfer_service.lift_balance(user, limit_order.quote_contract)
             balance.amount -= limit_order.quote_amount
@@ -341,12 +353,13 @@ class RichmetasInterpreter:
         return token_contract
 
 
-async def interpret(address: str):
-    richmetas = StarkRichmetas(
-        config('STARK_RICHMETAS_CONTRACT_ADDRESS', cast=parse_int),
-        feeder_gateway_client,
-        gateway_client)
-
+@inject
+async def interpret(
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas],
+        ledger_address: int = Provide[Container.config.ledger_address],
+        ledger_facade_address: int = Provide[Container.config.ledger_facade_address],
+        exchange_facade_address: int = Provide[Container.config.exchange_facade_address],
+        login_facade_admin_address: int = Provide[Container.config.login_facade_admin_address]):
     async with async_session() as session:
         try:
             (await session.execute(
@@ -360,33 +373,30 @@ async def interpret(address: str):
                 decimals=18))
             await session.commit()
 
+    addresses = [*map(hex, [
+        ledger_address,
+        ledger_facade_address,
+        exchange_facade_address,
+        login_facade_admin_address])]
     while True:
         async with async_session() as session:
-            try:
-                contract, = (await session.execute(
-                    select(StarkContract).where(StarkContract.address == address))).one()
-            except NoResultFound:
-                logging.warning('Failed to find contract')
+            block_counter, n = (await session.execute(
+                select(
+                    functions.coalesce(
+                        functions.max(StarkContract.block_counter),
+                        functions.min(Transaction.block_number)),
+                    functions.count()).
+                join(Transaction.contract).
+                where(Transaction.type == TYPE_DEPLOY).
+                where(StarkContract.address.in_(addresses)))).one()
+            if n < len(addresses):
+                logging.warning('Failed to find "DEPLOY"')
                 await asyncio.sleep(15)
                 continue
 
-            if contract.block_counter is None:
-                try:
-                    tx, = (await session.execute(
-                        select(Transaction).
-                        where(Transaction.contract == contract).
-                        where(Transaction.type == TYPE_DEPLOY).
-                        options(selectinload(Transaction.block)))).one()
-
-                    contract.block_counter = tx.block.id
-                except NoResultFound:
-                    logging.warning('Failed to find "DEPLOY"')
-                    await asyncio.sleep(15)
-                    continue
-
             try:
                 block, = (await session.execute(
-                    select(Block).where(Block.id == contract.block_counter))).one()
+                    select(Block).where(Block.id == block_counter))).one()
             except NoResultFound:
                 logging.warning('Failed to find block')
                 await asyncio.sleep(15)
@@ -396,13 +406,18 @@ async def interpret(address: str):
                 interpreter = RichmetasInterpreter(session, client, Web3())
                 for tx, in await session.execute(
                         select(Transaction).
+                        join(Transaction.contract).
                         where(Transaction.block == block).
-                        where(Transaction.contract == contract).
-                        order_by(Transaction.transaction_index)):
+                        where(StarkContract.address.in_(addresses)).
+                        order_by(Transaction.transaction_index).
+                        options(selectinload(Transaction.contract))):
                     logging.warning(f'interpret(tx={tx.hash})')
                     await interpreter.exec(tx)
 
-            contract.block_counter += 1
+            await session.execute(
+                update(StarkContract).
+                where(StarkContract.address.in_(addresses)).
+                values(block_counter=block_counter + 1))
             for transfer in (await session.execute(
                     select(Transfer).
                     where(Transfer.status.in_([Status.NOT_RECEIVED.value, Status.RECEIVED.value])).
@@ -432,6 +447,6 @@ async def interpret(address: str):
 
 
 @click.command()
-@click.argument('contract')
-def cli(contract: str):
-    asyncio.run(interpret(contract))
+def cli():
+    build_container()
+    asyncio.run(interpret())

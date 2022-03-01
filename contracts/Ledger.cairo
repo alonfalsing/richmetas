@@ -6,14 +6,9 @@ from starkware.cairo.common.math import assert_nn
 from starkware.starknet.common.messages import send_message_to_l1
 from admin import get_admin, change_admin
 from acl import get_access, toggle_access, acl_secure
-from LedgerInterface import KIND_ERC20, KIND_ERC721
+from LedgerInterface import ContractDescription, KIND_ERC20, KIND_ERC721
 
 const WITHDRAW = 0
-
-struct ContractDescription:
-    member kind : felt          # ERC20 / ERC721
-    member mint : felt          # minter
-end
 
 @storage_var
 func _l1_contract() -> (address : felt):

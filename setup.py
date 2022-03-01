@@ -34,6 +34,7 @@ setup(
             'stark = richmetas.stark_key:cli',
             'ether_monitor = richmetas.ether_monitor:cli',
             'ddd = richmetas.ddd:cli',
+            'load = richmetas.load:cli',
         ],
     },
 )

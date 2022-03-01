@@ -1,5 +1,7 @@
+import logging
 from pathlib import Path
 
+from decouple import config
 from dependency_injector import containers, providers
 from eth_account import Account
 from services.external_api.base_client import RetryConfig
@@ -14,10 +16,11 @@ from web3 import Web3
 from richmetas.contracts import EtherRichmetas, Forwarder
 from richmetas.contracts.starknet import Facade as StarkRichmetas
 from richmetas.sign import StarkKeyPair
+from richmetas.utils import parse_int
 
 
 class Container(containers.DeclarativeContainer):
-    wiring_config = containers.WiringConfiguration(modules=[".serve"])
+    wiring_config = containers.WiringConfiguration(modules=['.serve', '.interpret', '.load'])
     config = providers.Configuration()
 
     engine = providers.Singleton(
@@ -78,3 +81,37 @@ class Container(containers.DeclarativeContainer):
         stark_key)
 
     bucket_root = providers.Singleton(Path, config.bucket_root)
+
+
+def build_container():
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    container = Container()
+    container.config.from_dict(dict([
+        *map(lambda name: (name.lower(), config(name)), [
+            'FEEDER_GATEWAY_URL',
+            'GATEWAY_URL',
+            'STARK_NETWORK',
+
+            'ETHER_FORWARDER_CONTRACT_ADDRESS',
+            'ETHER_RICHMETAS_CONTRACT_ADDRESS',
+            'ETHER_PRIVATE_KEY',
+
+            'DATABASE_URL',
+
+            'BUCKET_ROOT',
+        ]),
+
+        *map(lambda name: (name.lower(), config(name, cast=parse_int)), [
+            'LEDGER_ADDRESS',
+            'LEDGER_FACADE_ADDRESS',
+            'EXCHANGE_ADDRESS',
+            'EXCHANGE_FACADE_ADDRESS',
+            'LOGIN_ADDRESS',
+            'LOGIN_FACADE_ADDRESS',
+            'LOGIN_FACADE_ADMIN_ADDRESS',
+            'LOGIN_FACADE_ADMIN_KEY',
+        ]),
+    ]))
+
+    return container

@@ -8,6 +8,7 @@ SOURCES	= \
 	LoginFacadeAdmin.cairo \
 	Ledger.cairo \
 	LedgerFacade.cairo \
+	LedgerLoader.cairo \
 	Exchange.cairo \
 	ExchangeFacade.cairo \
 	Staking.cairo \

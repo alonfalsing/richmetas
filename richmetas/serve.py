@@ -10,7 +10,6 @@ import pyrsistent
 from aiohttp import web
 from aiohttp.web_request import Request
 from aiojobs.aiohttp import setup, spawn
-from decouple import config
 from dependency_injector.wiring import Provide, inject
 from openapi_core import create_spec
 from rororo import OperationTableDef, setup_openapi, openapi_context
@@ -26,7 +25,7 @@ from starkware.starknet.services.api.gateway.gateway_client import GatewayClient
 from web3 import Web3
 
 from richmetas import utils
-from richmetas.containers import Container
+from richmetas.containers import Container, build_container
 from richmetas.contracts import Forwarder, ReqSchema, LimitOrder, EtherRichmetas, ContractKind, LimitOrderSchema
 from richmetas.contracts.starknet import Facade as StarkRichmetas
 from richmetas.services import TransferService
@@ -998,39 +997,11 @@ def authenticate(message: list[Union[int, str, bytes]], signature: list[str], st
 @click.command()
 @click.option('--port', default=4000, type=int)
 def serve(port: int):
-    container = Container()
-    container.config.from_dict(dict([
-        *map(lambda name: (name.lower(), config(name)), [
-            'FEEDER_GATEWAY_URL',
-            'GATEWAY_URL',
-            'STARK_NETWORK',
-
-            'ETHER_FORWARDER_CONTRACT_ADDRESS',
-            'ETHER_RICHMETAS_CONTRACT_ADDRESS',
-            'ETHER_PRIVATE_KEY',
-
-            'DATABASE_URL',
-
-            'BUCKET_ROOT',
-        ]),
-
-        *map(lambda name: (name.lower(), config(name, cast=parse_int)), [
-            'LEDGER_ADDRESS',
-            'LEDGER_FACADE_ADDRESS',
-            'EXCHANGE_ADDRESS',
-            'EXCHANGE_FACADE_ADDRESS',
-            'LOGIN_ADDRESS',
-            'LOGIN_FACADE_ADDRESS',
-            'LOGIN_FACADE_ADMIN_ADDRESS',
-            'LOGIN_FACADE_ADMIN_KEY',
-        ]),
-    ]))
-
     app = web.Application()
-    app.container = container
+    app.container = build_container()
     app.add_routes([
         web.post('/fs', upload),
-        web.static('/fs', container.bucket_root.provided())])
+        web.static('/fs', app.container.bucket_root.provided())])
 
     from yaml import load
     try:

@@ -19,6 +19,8 @@ from .Withdrawal import Withdrawal, WithdrawalSchema
 from .EthBlock import EthBlock
 from .EthEvent import EthEvent
 
+from .LoginLoad import LoginLoad
+
 
 class TokenContractVerboseSchema(TokenContractSchema):
     blueprint = fields.Nested(BlueprintSchema())

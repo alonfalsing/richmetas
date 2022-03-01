@@ -2,6 +2,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
+import aiohttp
 import click
 from services.external_api.base_client import BadRequest
 from sqlalchemy import delete, select
@@ -54,7 +55,7 @@ class Crawler:
                     j += 1
 
                     continue
-                except BadRequest:
+                except (BadRequest, aiohttp.ClientError):
                     cd = loop.time() + self._cooldown
 
             if i > 0:
