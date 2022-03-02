@@ -19,6 +19,9 @@ from .Withdrawal import Withdrawal, WithdrawalSchema
 from .EthBlock import EthBlock
 from .EthEvent import EthEvent
 
+from .DescriptionLoad import DescriptionLoad
+from .BalanceLoad import BalanceLoad
+from .TokenLoad import TokenLoad
 from .LoginLoad import LoginLoad
 
 

@@ -29,7 +29,7 @@ LimitOrderSchema = Schema.from_dict({
 
 class Exchange(BaseFeeder):
     async def get_order(self, id_):
-        result = await self._call('get_order', [id_])
+        result = await self.call('get_order', [id_])
 
         return LimitOrder._make(result)
 
@@ -38,15 +38,15 @@ class ExchangeFacade(Base):
     def create_order(self, id_, limit_order: LimitOrder, signature):
         authenticate_rr(limit_order.user, id_, *limit_order[1:-1], signature=signature)
 
-        return self._invoke('create_order', [id_, *limit_order[:-1]], signature)
+        return self.invoke('create_order', [id_, *limit_order[:-1]], signature)
 
     def fulfill_order(self, id_, user, nonce, signature):
         authenticate_rr(user, id_, nonce, signature=signature)
 
-        return self._invoke('fulfill_order', [id_, user, nonce], signature)
+        return self.invoke('fulfill_order', [id_, user, nonce], signature)
 
     def cancel_order(self, id_, nonce, signature, user=None):
         if user:
             authenticate_rr(user, id_, nonce, signature=signature)
 
-        return self._invoke('cancel_order', [id_, nonce], signature)
+        return self.invoke('cancel_order', [id_, nonce], signature)

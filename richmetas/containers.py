@@ -15,6 +15,7 @@ from web3 import Web3
 
 from richmetas.contracts import EtherRichmetas, Forwarder
 from richmetas.contracts.starknet import Facade as StarkRichmetas
+from richmetas.contracts.starknet.base import BaseFeeder
 from richmetas.sign import StarkKeyPair
 from richmetas.utils import parse_int
 
@@ -79,6 +80,10 @@ class Container(containers.DeclarativeContainer):
         config.login_facade_address,
         config.login_facade_admin_address,
         stark_key)
+    legacy_ledger = providers.Factory(
+        BaseFeeder,
+        config.legacy_ledger_address,
+        feeder_gateway)
 
     bucket_root = providers.Singleton(Path, config.bucket_root)
 
@@ -111,6 +116,8 @@ def build_container():
             'LOGIN_FACADE_ADDRESS',
             'LOGIN_FACADE_ADMIN_ADDRESS',
             'LOGIN_FACADE_ADMIN_KEY',
+
+            'LEGACY_LEDGER_ADDRESS',
         ]),
     ]))
 
