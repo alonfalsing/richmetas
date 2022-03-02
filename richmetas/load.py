@@ -93,6 +93,7 @@ async def load_balances(async_session: sessionmaker = Provide[Container.async_se
 
 async def load_token(
         token: Token,
+        owner=None,
         ledger_contract: BaseContract = Provide[Container.ledger_contract],
         legacy_ledger: BaseFeeder = Provide[Container.legacy_ledger],
         admin_key: StarkKeyPair = Provide[Container.stark_key],
@@ -102,13 +103,13 @@ async def load_token(
     calldata = [
         int(token.token_id),
         token.contract.address,
-        int(token.owner.stark_key),
+        int(owner or token.owner.stark_key),
         origin,
         uuid4().int]
     signature = [*admin_key.sign(*calldata)]
 
     logging.warning(f'load_token({calldata[0]}, {calldata[1]}, {calldata[2]}, {calldata[3]})')
-    tx = await gateway.add_transaction(ledger_contract.invoke('load_owner', calldata, signature))
+    tx = await gateway.add_transaction(ledger_contract.invoke('load_token', calldata, signature))
 
     return tx['transaction_hash']
 
@@ -179,7 +180,7 @@ async def load_exchange(
         load = LimitOrderLoad(order=order, tx_hash=tx['transaction_hash'])
         session.add(load)
         if order.state == State.NEW and not order.bid:
-            load.tx_hash2 = await load_token(order.token)
+            load.tx_hash2 = await load_token(order.token, exchange_contract.address)
 
         await session.commit()
 
