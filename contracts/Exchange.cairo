@@ -6,14 +6,7 @@ from starkware.starknet.common.syscalls import get_contract_address
 from acl import get_access, toggle_access, acl_secure
 from admin import get_admin, change_admin
 from LedgerInterface import LedgerInterface, KIND_ERC20, KIND_ERC721
-from ExchangeInterface import LimitOrder
-
-const ASK = 0
-const BID = 1
-
-const STATE_NEW = 0
-const STATE_FULFILLED = 1
-const STATE_CANCELLED = 2
+from ExchangeInterface import LimitOrder, ASK, BID, STATE_NEW, STATE_FULFILLED, STATE_CANCELLED
 
 @storage_var
 func _ledger() -> (address : felt):

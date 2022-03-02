@@ -22,6 +22,7 @@ from .EthEvent import EthEvent
 from .DescriptionLoad import DescriptionLoad
 from .BalanceLoad import BalanceLoad
 from .TokenLoad import TokenLoad
+from .LimitOrderLoad import LimitOrderLoad
 from .LoginLoad import LoginLoad
 
 

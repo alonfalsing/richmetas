@@ -4,11 +4,8 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import assert_nn
 from starkware.cairo.common.registers import get_fp_and_pc
 from lib import authenticate
+from loader import get_owner, change_owner
 from LedgerInterface import ContractDescription, KIND_ERC20, KIND_ERC721
-
-@storage_var
-func _Loader_owner() -> (user : felt):
-end
 
 @storage_var
 func _description(contract : felt) -> (desc : ContractDescription):
@@ -28,34 +25,10 @@ end
 
 @constructor
 func constructor{
-        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        owner : felt):
-    _Loader_owner.write(owner)
-
-    return ()
-end
-
-@view
-func get_owner{
-        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        user : felt):
-    return _Loader_owner.read()
-end
-
-@external
-func change_owner{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        user : felt, nonce : felt):
-    let (owner) = _Loader_owner.read()
-    if owner == 0:
-        _Loader_owner.write(user)
-        return ()
-    end
+        owner : felt):
+    change_owner(owner, 0)
 
-    let (__fp__, _) = get_fp_and_pc()
-    authenticate(owner, 2, &user)
-
-    _Loader_owner.write(user)
     return ()
 end
 
@@ -64,7 +37,7 @@ func load_description{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         contract : felt, kind : felt, mint : felt, nonce : felt):
     assert (kind - KIND_ERC20) * (kind - KIND_ERC721) = 0
-    let (admin) = _Loader_owner.read()
+    let (admin) = get_owner()
     let (__fp__, _) = get_fp_and_pc()
 
     authenticate(admin, 4, &contract)
@@ -80,7 +53,7 @@ func load_balance{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         user : felt, contract : felt, balance : felt, nonce : felt):
     assert_nn(balance)
-    let (admin) = _Loader_owner.read()
+    let (admin) = get_owner()
     let (__fp__, _) = get_fp_and_pc()
 
     authenticate(admin, 4, &user)
@@ -94,7 +67,7 @@ func load_token{
         syscall_ptr : felt*, ecdsa_ptr : SignatureBuiltin*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         token_id : felt, contract : felt, owner : felt, mint : felt, nonce : felt):
     assert_nn(token_id)
-    let (admin) = _Loader_owner.read()
+    let (admin) = get_owner()
     let (__fp__, _) = get_fp_and_pc()
 
     authenticate(admin, 5, &token_id)

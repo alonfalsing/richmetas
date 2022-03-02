@@ -1,5 +1,12 @@
 %lang starknet
 
+const ASK = 0
+const BID = 1
+
+const STATE_NEW = 0
+const STATE_FULFILLED = 1
+const STATE_CANCELLED = 2
+
 struct LimitOrder:
     member user : felt
     member bid : felt

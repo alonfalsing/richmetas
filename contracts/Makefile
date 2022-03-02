@@ -11,6 +11,7 @@ SOURCES	= \
 	LedgerLoader.cairo \
 	Exchange.cairo \
 	ExchangeFacade.cairo \
+	ExchangeLoader.cairo \
 	Staking.cairo \
 	StakingFacade.cairo \
 	StakingFacadeAdmin.cairo \

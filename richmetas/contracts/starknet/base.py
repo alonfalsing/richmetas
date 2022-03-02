@@ -9,6 +9,10 @@ class Base:
     def __init__(self, address: int):
         self._address = address
 
+    @property
+    def address(self):
+        return self._address
+
     def invoke(self, name, calldata, signature) -> InvokeFunction:
         return InvokeFunction(
             contract_address=self._address,
