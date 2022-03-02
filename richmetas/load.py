@@ -86,7 +86,7 @@ async def load_balances(async_session: sessionmaker = Provide[Container.async_se
                 break
 
             load = BalanceLoad(balance=balance, tx_hash=await load_balance(
-                balance.amount.stark_key, balance.contract.address, balance.amount))
+                balance.account.stark_key, balance.contract.address, balance.amount))
             session.add(load)
             await session.commit()
 
