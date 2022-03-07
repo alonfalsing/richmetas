@@ -13,6 +13,9 @@ namespace LedgerInterface:
     func describe(contract : felt) -> (desc : ContractDescription):
     end
 
+    func get_owner(token_id : felt, contract : felt) -> (user : felt):
+    end
+
     func withdraw(user : felt, amount_or_token_id : felt, contract : felt, address : felt, nonce: felt):
     end
 

@@ -15,6 +15,8 @@ SOURCES	= \
 	Staking.cairo \
 	StakingFacade.cairo \
 	StakingFacadeAdmin.cairo \
+	Composer.cairo \
+	ComposerFacade.cairo \
 	Proxy.cairo \
 	ProxyAdmin.cairo \
 	Richmetas.sol \

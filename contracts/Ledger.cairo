@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_nn
+from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.starknet.common.messages import send_message_to_l1
 from admin import get_admin, change_admin
 from acl import get_access, toggle_access, acl_secure
@@ -182,6 +182,7 @@ func transfer{
         from_ : felt, to_ : felt, amount_or_token_id : felt, contract : felt):
     acl_secure()
     assert_nn(amount_or_token_id)
+    assert_not_zero(from_)
 
     let (desc) = _description.read(contract=contract)
     assert (desc.kind - KIND_ERC20) * (desc.kind - KIND_ERC721) = 0

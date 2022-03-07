@@ -31,9 +31,7 @@ func initialize{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         ledger : felt):
     let (address) = _ledger.read()
-    if address != 0:
-        return ()
-    end
+    assert address = 0
 
     _ledger.write(ledger)
     return ()
@@ -51,7 +49,7 @@ func get_order{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         id : felt) -> (
         order : LimitOrder):
-    return _order.read(id=id)
+    return _order.read(id)
 end
 
 @external
