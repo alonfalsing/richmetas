@@ -10,6 +10,18 @@ from StakingInterface import Revenue, Staking
 
 const INTEREST_SCALE = 10 ** 6
 
+@event
+func set_revenue_event(contract : felt, revenue : Revenue):
+end
+
+@event
+func stake_event(id : felt, staking : Staking):
+end
+
+@event
+func unstake_event(id : felt):
+end
+
 @storage_var
 func _ledger() -> (address : felt):
 end
@@ -74,10 +86,10 @@ func set_revenue{
     assert desc.kind = KIND_ERC20
     assert_not_zero(faucet)
 
-    _revenue.write(contract, Revenue(
-        interest_or_amount=interest_or_amount,
-        contract=revenue_contract,
-        faucet=faucet))
+    let revenue = Revenue(
+        interest_or_amount=interest_or_amount, contract=revenue_contract, faucet=faucet)
+    _revenue.write(contract=contract, value=revenue)
+    set_revenue_event.emit(contract=contract, revenue=revenue)
 
     return ()
 end
@@ -112,12 +124,14 @@ func stake{
         contract=contract)
 
     let (timestamp) = get_block_timestamp()
-    _staking.write(id, Staking(
+    let staking = Staking(
         user=user,
         amount_or_token_id=amount_or_token_id,
         contract=contract,
         started_at=timestamp,
-        ended_at=0))
+        ended_at=0)
+    _staking.write(id=id, value=staking)
+    stake_event.emit(id=id, staking=staking)
 
     return ()
 end
@@ -164,6 +178,7 @@ func unstake{
         amount_or_token_id=outputs,
         contract=revenue.contract)
 
+    unstake_event.emit(id)
     return ()
 end
 

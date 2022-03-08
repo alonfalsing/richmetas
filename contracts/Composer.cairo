@@ -10,20 +10,58 @@ from ComposerInterface import Stereotype
 
 const ARM_INPUT = 1
 const ARM_OUTPUT = 2
+const ARM_INSTALL = 3
 
 const STATE_NEW = 0
 const STATE_OPEN = 1
 const STATE_READY = 2           # .inputs == .installed
-const STATE_CLOSED = 4
+const STATE_CLOSED = 3
 
 struct Token:
     member token_id : felt
     member contract : felt
 end
 
+struct Iota:
+    member arm : felt
+    member index : felt
+end
+
 struct Install:
     member stereotype_id : felt
     member owner : felt
+end
+
+@event
+func create_stereotype_event(id : felt, admin : felt, user : felt):
+end
+
+@event
+func add_token_event(
+        token_id : felt, contract : felt, io : felt, stereotype_id : felt):
+end
+
+@event
+func remove_token_event(
+        token_id : felt, contract : felt, io : felt, stereotype_id : felt):
+end
+
+@event
+func activate_stereotype_event(id : felt):
+end
+
+@event
+func install_token_event(
+        token_id : felt, contract : felt, stereotype_id : felt):
+end
+
+@event
+func uninstall_token_event(
+        token_id : felt, contract : felt, stereotype_id : felt):
+end
+
+@event
+func execute_stereotype_event(id : felt):
 end
 
 @storage_var
@@ -35,14 +73,14 @@ func _stereotype(id : felt) -> (stereotype : Stereotype):
 end
 
 @storage_var
-func _token(stereotype_id : felt, io : felt, i : felt) -> (token : Token):
+func _token(stereotype_id : felt, arm : felt, i : felt) -> (token : Token):
 end
 
 # i/o arm
 @storage_var
-func _arm(
+func _iota(
         token_id : felt, contract : felt, stereotype_id : felt) -> (
-        arm : felt):
+        iota : Iota):
 end
 
 @storage_var
@@ -102,25 +140,36 @@ func create_stereotype{
         admin=admin,
         user=user,
         state=STATE_NEW))
+    create_stereotype_event.emit(id=id, admin=admin, user=user)
+
     return ()
+end
+
+@external
+func get_token{
+        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        stereotype_id : felt, arm : felt, i : felt) -> (
+        token : Token):
+    return _token.read(stereotype_id=stereotype_id, arm=arm, i=i)
 end
 
 @external
 func add_token{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        io : felt, token_id : felt, contract : felt, stereotype_id : felt):
-    assert (io - ARM_INPUT) * (io - ARM_OUTPUT) = 0
+        token_id : felt, contract : felt, io : felt, stereotype_id : felt):
     assert_nn(token_id)
     let (ledger) = _ledger.read()
     let (description) = LedgerInterface.describe(
         contract_address=ledger, contract=contract)
     assert description.kind = KIND_ERC721
+    assert (io - ARM_INPUT) * (io - ARM_OUTPUT) = 0
     let (stereotype) = _stereotype.read(stereotype_id)
     assert stereotype.state = STATE_NEW
+    assert_not_zero(stereotype.admin)
     assert (io - ARM_INPUT) * (description.mint - stereotype.admin) = 0
-    let (arm) = _arm.read(
+    let (iota) = _iota.read(
         token_id=token_id, contract=contract, stereotype_id=stereotype_id)
-    assert arm = 0
+    assert iota.arm = 0
 
     if io == ARM_INPUT:
         tempvar i = stereotype.inputs
@@ -143,13 +192,18 @@ func add_token{
             state=STATE_NEW)
     end
     let token = Token(token_id=token_id, contract=contract)
-    _token.write(stereotype_id=stereotype_id, io=io, i=i, value=token)
-    _arm.write(
+    _token.write(stereotype_id=stereotype_id, arm=io, i=i, value=token)
+    _iota.write(
         token_id=token_id,
         contract=contract,
         stereotype_id=stereotype_id,
-        value=io)
+        value=Iota(arm=io, index=i))
     _stereotype.write(id=stereotype_id, value=stereotype)
+    add_token_event.emit(
+        token_id=token_id,
+        contract=contract,
+        io=io,
+        stereotype_id=stereotype_id)
 
     return ()
 end
@@ -157,17 +211,16 @@ end
 @external
 func remove_token{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        io : felt, i : felt, stereotype_id : felt):
-    assert (io - ARM_INPUT) * (io - ARM_OUTPUT) = 0
-    assert_nn(i)
+        token_id : felt, contract : felt, stereotype_id : felt):
     let (stereotype) = _stereotype.read(stereotype_id)
     assert stereotype.state = STATE_NEW
+    assert_not_zero(stereotype.admin)
+    let (iota) = _iota.read(
+        token_id=token_id, contract=contract, stereotype_id=stereotype_id)
+    assert (iota.arm - ARM_INPUT) * (iota.arm - ARM_OUTPUT) = 0
 
-    if io == ARM_INPUT:
-        assert_lt(i, stereotype.inputs)
-        let (tok) = _token.read(
-            stereotype_id=stereotype_id, io=io, i=stereotype.inputs)
-        tempvar token = tok
+    if iota.arm == ARM_INPUT:
+        tempvar i = stereotype.inputs - 1
         tempvar stereotype = Stereotype(
             inputs=stereotype.inputs - 1,
             outputs=stereotype.outputs,
@@ -177,10 +230,7 @@ func remove_token{
             state=STATE_NEW)
     else:
         # output
-        assert_lt(i, stereotype.outputs)
-        let (tok) = _token.read(
-            stereotype_id=stereotype_id, io=io, i=stereotype.outputs)
-        tempvar token = tok
+        tempvar i = stereotype.outputs - 1
         tempvar stereotype = Stereotype(
             inputs=stereotype.inputs,
             outputs=stereotype.outputs - 1,
@@ -189,14 +239,25 @@ func remove_token{
             user=stereotype.user,
             state=STATE_NEW)
     end
-    let (old) = _token.read(stereotype_id=stereotype_id, io=io, i=i)
-    _arm.write(
-        token_id=old.token_id,
-        contract=old.contract,
+    let (token) = _token.read(stereotype_id=stereotype_id, arm=iota.arm, i=i)
+    _token.write(
+        stereotype_id=stereotype_id, arm=iota.arm, i=iota.index, value=token)
+    _iota.write(
+        token_id=token.token_id,
+        contract=token.contract,
         stereotype_id=stereotype_id,
-        value=0)
-    _token.write(stereotype_id=stereotype_id, io=io, i=i, value=token)
+        value=iota)
+    _iota.write(
+        token_id=token_id,
+        contract=contract,
+        stereotype_id=stereotype_id,
+        value=Iota(0, 0))
     _stereotype.write(id=stereotype_id, value=stereotype)
+    remove_token_event.emit(
+        token_id=token_id,
+        contract=contract,
+        io=iota.arm,
+        stereotype_id=stereotype_id)
 
     return ()
 end
@@ -206,6 +267,10 @@ func activate_stereotype{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         id : felt):
     let (stereotype) = _stereotype.read(id)
+    if stereotype.state == STATE_OPEN:
+        return ()
+    end
+
     assert stereotype.state = STATE_NEW
     assert_lt(0, stereotype.inputs)
     assert_lt(0, stereotype.outputs)
@@ -217,6 +282,7 @@ func activate_stereotype{
         admin=stereotype.admin,
         user=stereotype.user,
         state=STATE_OPEN))
+    activate_stereotype_event.emit(id)
     return ()
 end
 
@@ -224,18 +290,15 @@ end
 func install_token{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         user : felt, token_id : felt, contract : felt, stereotype_id : felt):
-    let (ledger) = _ledger.read()
-    let (owner) = LedgerInterface.get_owner(
-        contract_address=ledger, token_id=token_id, contract=contract)
-    assert user = owner
+    let (install) = _install.read(token_id=token_id, contract=contract)
+    assert install.stereotype_id = 0
     let (stereotype) = _stereotype.read(stereotype_id)
     assert stereotype.state = STATE_OPEN
-    let (install) = _install.read(token_id, contract)
-    assert install.stereotype_id = 0
-    let (arm) = _arm.read(
+    let (iota) = _iota.read(
         token_id=token_id, contract=contract, stereotype_id=stereotype_id)
-    assert arm = ARM_INPUT
+    assert iota.arm = ARM_INPUT
 
+    let (ledger) = _ledger.read()
     let (address) = get_contract_address()
     LedgerInterface.transfer(
         contract_address=ledger,
@@ -244,8 +307,17 @@ func install_token{
         amount_or_token_id=token_id,
         contract=contract)
     _install.write(token_id=token_id, contract=contract, value=Install(
+        stereotype_id=stereotype_id, owner=user))
+    _token.write(
         stereotype_id=stereotype_id,
-        owner=user))
+        arm=ARM_INSTALL,
+        i=stereotype.installs,
+        value=Token(token_id=token_id, contract=contract))
+    _iota.write(
+        token_id=token_id,
+        contract=contract,
+        stereotype_id=stereotype_id,
+        value=Iota(arm=ARM_INSTALL, index=stereotype.installs))
     _stereotype.write(id=stereotype_id, value=Stereotype(
         inputs=stereotype.inputs,
         outputs=stereotype.outputs,
@@ -254,6 +326,8 @@ func install_token{
         user=stereotype.user,
         state=STATE_OPEN))
 
+    install_token_event.emit(
+        token_id=token_id, contract=contract, stereotype_id=stereotype_id)
     return ()
 end
 
@@ -261,10 +335,13 @@ end
 func uninstall_token{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         token_id : felt, contract : felt, stereotype_id : felt):
+    let (install) = _install.read(token_id=token_id, contract=contract)
+    assert install.stereotype_id = stereotype_id
     let (stereotype) = _stereotype.read(stereotype_id)
     assert stereotype.state = STATE_OPEN
-    let (install) = _install.read(token_id, contract)
-    assert install.stereotype_id = stereotype_id
+    let (iota) = _iota.read(
+        token_id=token_id, contract=contract, stereotype_id=stereotype_id)
+    assert iota.arm = ARM_INSTALL
 
     let (ledger) = _ledger.read()
     let (address) = get_contract_address()
@@ -274,8 +351,20 @@ func uninstall_token{
         to_=install.owner,
         amount_or_token_id=token_id,
         contract=contract)
-    _install.write(token_id=token_id, contract=contract, value=Install(
-        stereotype_id=0, owner=0))
+    _install.write(token_id=token_id, contract=contract, value=Install(0, 0))
+    let (token) = _token.read(
+        stereotype_id=stereotype_id, arm=ARM_INSTALL, i=stereotype.installs - 1)
+    _token.write(stereotype_id=stereotype_id, arm=ARM_INSTALL, i=iota.index, value=token)
+    _iota.write(
+        token_id=token.token_id,
+        contract=token.contract,
+        stereotype_id=stereotype_id,
+        value=Iota(arm=ARM_INSTALL, index=iota.index))
+    _iota.write(
+        token_id=token_id,
+        contract=contract,
+        stereotype_id=stereotype_id,
+        value=Iota(0, 0))
     _stereotype.write(id=stereotype_id, value=Stereotype(
         inputs=stereotype.inputs,
         outputs=stereotype.outputs,
@@ -284,22 +373,24 @@ func uninstall_token{
         user=stereotype.user,
         state=STATE_OPEN))
 
+    uninstall_token_event.emit(
+        token_id=token_id, contract=contract, stereotype_id=stereotype_id)
     return ()
 end
 
 @external
-func execute{
+func execute_stereotype{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        stereotype_id : felt):
+        id : felt):
     alloc_locals
 
-    let (local stereotype) = _stereotype.read(stereotype_id)
+    let (local stereotype) = _stereotype.read(id)
     assert stereotype.state = STATE_OPEN
     assert stereotype.inputs = stereotype.installs
 
     let (ledger) = _ledger.read()
-    mint(stereotype, stereotype_id, 0, ledger)
-    _stereotype.write(id=stereotype_id, value=Stereotype(
+    mint(stereotype, id, 0, ledger)
+    _stereotype.write(id=id, value=Stereotype(
         inputs=stereotype.inputs,
         outputs=stereotype.outputs,
         installs=stereotype.installs,
@@ -307,6 +398,7 @@ func execute{
         user=stereotype.user,
         state=STATE_CLOSED))
 
+    execute_stereotype_event.emit(id)
     return ()
 end
 
@@ -317,7 +409,7 @@ func mint{
         return ()
     end
 
-    let (token) = _token.read(stereotype_id=stereotype_id, io=ARM_OUTPUT, i=i)
+    let (token) = _token.read(stereotype_id=stereotype_id, arm=ARM_OUTPUT, i=i)
     LedgerInterface.mint(
         contract_address=ledger,
         user=stereotype.user,

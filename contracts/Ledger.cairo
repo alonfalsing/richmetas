@@ -10,6 +10,26 @@ from LedgerInterface import ContractDescription, KIND_ERC20, KIND_ERC721
 
 const WITHDRAW = 0
 
+@event
+func register_contract_event(contract : felt, kind : felt, mint : felt):
+end
+
+@event
+func deposit_event(user : felt, amount_or_token_id : felt, contract : felt):
+end
+
+@event
+func withdraw_event(user : felt, amount_or_token_id : felt, contract : felt, address : felt, mint : felt, nonce : felt):
+end
+
+@event
+func transfer_event(from_ : felt, to_ : felt, amount_or_token_id : felt, contract : felt):
+end
+
+@event
+func mint_event(user : felt, token_id : felt, contract : felt):
+end
+
 @storage_var
 func _l1_contract() -> (address : felt):
 end
@@ -101,9 +121,8 @@ func register_contract{
     let (desc) = _description.read(contract=contract)
     assert desc.kind = 0
 
-    _description.write(contract, ContractDescription(
-        kind=kind,
-        mint=mint))
+    _description.write(contract, ContractDescription(kind=kind, mint=mint))
+    register_contract_event.emit(contract=contract, kind=kind, mint=mint)
 
     return ()
 end
@@ -131,6 +150,7 @@ func deposit{
         _owner.write(amount_or_token_id, contract, user)
     end
 
+    deposit_event.emit(user=user, amount_or_token_id=amount_or_token_id, contract=contract)
     return ()
 end
 
@@ -168,10 +188,14 @@ func withdraw{
     assert payload[3] = contract
     assert payload[4] = mint
     assert payload[5] = nonce
-    send_message_to_l1(
-        to_address=l1_contract,
-        payload_size=6,
-        payload=payload)
+    send_message_to_l1(to_address=l1_contract, payload_size=6, payload=payload)
+    withdraw_event.emit(
+        user=user,
+        amount_or_token_id=amount_or_token_id,
+        contract=contract,
+        address=address,
+        mint=mint,
+        nonce=nonce)
 
     return ()
 end
@@ -204,6 +228,7 @@ func transfer{
         _owner.write(amount_or_token_id, contract, to_)
     end
 
+    transfer_event.emit(from_=from_, to_=to_, amount_or_token_id=amount_or_token_id, contract=contract)
     return ()
 end
 
@@ -222,6 +247,7 @@ func mint{
 
     _owner.write(token_id, contract, user)
     _mint.write(token_id, contract, 1)
+    mint_event.emit(user=user, token_id=token_id, contract=contract)
 
     return ()
 end

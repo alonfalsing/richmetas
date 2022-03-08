@@ -34,9 +34,9 @@ func add_token{
         ecdsa_ptr : SignatureBuiltin*,
         pedersen_ptr : HashBuiltin*,
         range_check_ptr}(
-        io : felt,
         token_id : felt,
         contract : felt,
+        io : felt,
         stereotype_id : felt,
         nonce : felt):
     alloc_locals
@@ -45,13 +45,13 @@ func add_token{
     let (stereotype) = ComposerInterface.get_stereotype(
         contract_address=underpinning, id=stereotype_id)
     let (__fp__, _) = get_fp_and_pc()
-    authenticate(stereotype.admin, 5, &io)
+    authenticate(stereotype.admin, 5, &token_id)
 
     ComposerInterface.add_token(
         contract_address=underpinning,
-        io=io,
         token_id=token_id,
         contract=contract,
+        io=io,
         stereotype_id=stereotype_id)
     return ()
 end
@@ -62,19 +62,19 @@ func remove_token{
         ecdsa_ptr : SignatureBuiltin*,
         pedersen_ptr : HashBuiltin*,
         range_check_ptr}(
-        io : felt, i : felt, stereotype_id : felt, nonce : felt):
+        token_id : felt, contract : felt, stereotype_id : felt, nonce : felt):
     alloc_locals
 
     let (local underpinning) = get_underpinning()
     let (stereotype) = ComposerInterface.get_stereotype(
         contract_address=underpinning, id=stereotype_id)
     let (__fp__, _) = get_fp_and_pc()
-    authenticate(stereotype.admin, 4, &io)
+    authenticate(stereotype.admin, 4, &token_id)
 
     ComposerInterface.remove_token(
         contract_address=underpinning,
-        io=io,
-        i=i,
+        token_id=token_id,
+        contract=contract,
         stereotype_id=stereotype_id)
     return ()
 end
@@ -94,8 +94,7 @@ func activate_stereotype{
     let (__fp__, _) = get_fp_and_pc()
     authenticate(stereotype.admin, 2, &id)
 
-    ComposerInterface.activate_stereotype(
-        contract_address=underpinning, id=id)
+    ComposerInterface.activate_stereotype(contract_address=underpinning, id=id)
     return ()
 end
 
@@ -151,21 +150,20 @@ func uninstall_token{
 end
 
 @external
-func execute{
+func execute_stereotype{
         syscall_ptr : felt*,
         ecdsa_ptr : SignatureBuiltin*,
         pedersen_ptr : HashBuiltin*,
         range_check_ptr}(
-        stereotype_id : felt, nonce : felt):
+        id : felt, nonce : felt):
     alloc_locals
 
     let (local underpinning) = get_underpinning()
     let (stereotype) = ComposerInterface.get_stereotype(
-        contract_address=underpinning, id=stereotype_id)
+        contract_address=underpinning, id=id)
     let (__fp__, _) = get_fp_and_pc()
-    authenticate(stereotype.user, 2, &stereotype_id)
+    authenticate(stereotype.user, 2, &id)
 
-    ComposerInterface.execute(
-        contract_address=underpinning, stereotype_id=stereotype_id)
+    ComposerInterface.execute_stereotype(contract_address=underpinning, id=id)
     return ()
 end

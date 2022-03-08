@@ -8,6 +8,18 @@ from admin import get_admin, change_admin
 from LedgerInterface import LedgerInterface, KIND_ERC20, KIND_ERC721
 from ExchangeInterface import LimitOrder, ASK, BID, STATE_NEW, STATE_FULFILLED, STATE_CANCELLED
 
+@event
+func create_order_event(id : felt, order : LimitOrder):
+end
+
+@event
+func fulfill_order_event(id : felt, user : felt):
+end
+
+@event
+func cancel_order_event(id : felt):
+end
+
 @storage_var
 func _ledger() -> (address : felt):
 end
@@ -90,14 +102,16 @@ func create_order{
             contract=quote_contract)
     end
 
-    _order.write(id, LimitOrder(
+    let order = LimitOrder(
         user=user,
         bid=bid,
         base_contract=base_contract,
         base_token_id=base_token_id,
         quote_contract=quote_contract,
         quote_amount=quote_amount,
-        state=STATE_NEW))
+        state=STATE_NEW)
+    _order.write(id=id, value=order)
+    create_order_event.emit(id=id, order=order)
 
     return ()
 end
@@ -151,6 +165,7 @@ func fulfill_order{
         quote_contract=order.quote_contract,
         quote_amount=order.quote_amount,
         state=STATE_FULFILLED))
+    fulfill_order_event.emit(id=id, user=user)
 
     return ()
 end
@@ -192,6 +207,7 @@ func cancel_order{
         quote_contract=order.quote_contract,
         quote_amount=order.quote_amount,
         state=STATE_CANCELLED))
+    cancel_order_event.emit(id)
 
     return ()
 end

@@ -17,10 +17,10 @@ namespace ComposerInterface:
     func create_stereotype(id : felt, admin : felt, user : felt):
     end
 
-    func add_token(io : felt, token_id : felt, contract : felt, stereotype_id : felt):
+    func add_token(token_id : felt, contract : felt, io : felt, stereotype_id : felt):
     end
 
-    func remove_token(io : felt, i : felt, stereotype_id : felt):
+    func remove_token(token_id : felt, contract : felt, stereotype_id : felt):
     end
 
     func activate_stereotype(id : felt):
@@ -32,6 +32,6 @@ namespace ComposerInterface:
     func uninstall_token(token_id : felt, contract : felt, stereotype_id : felt):
     end
 
-    func execute(stereotype_id : felt):
+    func execute_stereotype(id : felt):
     end
 end

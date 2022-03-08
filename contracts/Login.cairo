@@ -4,6 +4,10 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from admin import get_admin, change_admin
 from acl import get_access, toggle_access, acl_secure
 
+@event
+func register_account_event(stark_key : felt, ethereum_address : felt):
+end
+
 @storage_var
 func _account(ethereum_address : felt) -> (stark_key : felt):
 end
@@ -31,6 +35,7 @@ func register_account{
         stark_key : felt, ethereum_address : felt):
     acl_secure()
     _account.write(ethereum_address=ethereum_address, value=stark_key)
+    register_account_event.emit(stark_key=stark_key, ethereum_address=ethereum_address)
 
     return ()
 end

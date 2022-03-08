@@ -19,6 +19,7 @@ setup(
         'ethereum',
         'jsonschema',
         'marshmallow',
+        'more-itertools',
         'pendulum',
         'py-eth-sig-utils',
         'python-decouple',
