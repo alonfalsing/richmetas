@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 from eth_account import Account
-from more_itertools import repeatfunc
+from more_itertools import repeatfunc, collapse
 from starkware.starknet.public.abi import get_selector_from_name
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
@@ -219,3 +219,27 @@ async def test_execute_stereotype(deploy_ledger, deploy_composer, register_contr
     for i in [0, 1]:
         exec_info = await ledger_contract.get_owner(tokens[i], nft_contract_addresses[i]).call()
         assert exec_info.result == (k2.stark_key,)
+    for i in [3, 4, 5]:
+        exec_info = await ledger_contract.get_owner(tokens[i], nft_contract_addresses[i]).call()
+        assert exec_info.result == (composer_contract.contract_address,)
+
+
+@pytest.mark.asyncio
+async def test_launch_and_solve_stereotype(deploy_composer, register_contract, deposit):
+    facade_contract, composer_contract, k = deploy_composer
+    nft_contract_address, k2 = register_contract
+    tokens, = deposit
+
+    inputs = [(tokens[i], nft_contract_address[i]) for i in [3, 4, 5]]
+    outputs = [(tokens[i], nft_contract_address[i]) for i in [0, 1]]
+    calldata = [uuid4().int, k.stark_key, k2.stark_key, inputs, outputs]
+    signature = k.sign(calldata[0], k2.stark_key, *collapse(inputs), *collapse(outputs))
+    await facade_contract.launch_stereotype(*calldata).invoke(signature=[*signature])
+    exec_info = await composer_contract.get_stereotype(calldata[0]).call()
+    assert exec_info.result == ((3, 2, 0, k.stark_key, k2.stark_key, 1),)
+
+    calldata = [calldata[0], uuid4().int]
+    signature = k2.sign(*calldata)
+    await facade_contract.solve_stereotype(*calldata).invoke(signature=[*signature])
+    exec_info = await composer_contract.get_stereotype(calldata[0]).call()
+    assert exec_info.result == ((3, 2, 3, k.stark_key, k2.stark_key, 3),)

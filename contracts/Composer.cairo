@@ -6,30 +6,16 @@ from starkware.starknet.common.syscalls import get_contract_address
 from acl import get_access, toggle_access, acl_secure
 from admin import get_admin, change_admin
 from LedgerInterface import LedgerInterface, KIND_ERC721
-from ComposerInterface import Stereotype
-
-const ARM_INPUT = 1
-const ARM_OUTPUT = 2
-const ARM_INSTALL = 3
+from ComposerInterface import Stereotype, Token, Install, ARM_INPUT, ARM_OUTPUT, ARM_INSTALL
 
 const STATE_NEW = 0
 const STATE_OPEN = 1
 const STATE_READY = 2           # .inputs == .installed
 const STATE_CLOSED = 3
 
-struct Token:
-    member token_id : felt
-    member contract : felt
-end
-
 struct Iota:
     member arm : felt
     member index : felt
-end
-
-struct Install:
-    member stereotype_id : felt
-    member owner : felt
 end
 
 @event
@@ -145,7 +131,7 @@ func create_stereotype{
     return ()
 end
 
-@external
+@view
 func get_token{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         stereotype_id : felt, arm : felt, i : felt) -> (
@@ -284,6 +270,14 @@ func activate_stereotype{
         state=STATE_OPEN))
     activate_stereotype_event.emit(id)
     return ()
+end
+
+@view
+func get_install{
+        syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        token_id : felt, contract : felt) -> (
+        install : Install):
+    return _install.read(token_id=token_id, contract=contract)
 end
 
 @external

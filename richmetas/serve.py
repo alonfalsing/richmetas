@@ -924,6 +924,213 @@ async def cancel_order(
 
 @operations.register
 @inject
+async def create_stereotype(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.create_stereotype(
+                context.data['id'],
+                context.data['admin'],
+                context.data['user']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def get_stereotype(
+        request: Request,
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    from richmetas.contracts.starknet.composer import StereotypeSchema
+
+    with openapi_context(request) as context:
+        stereotype = await richmetas.get_stereotype(context.parameters.path['id'])
+        if stereotype is None:
+            return web.HTTPNotFound()
+
+        return web.json_response(StereotypeSchema().dump(stereotype))
+
+
+@operations.register
+@inject
+async def stereotype_add_token(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    from richmetas.contracts.starknet.composer import Arm
+
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.add_token(
+                context.data['token_id'],
+                context.data['contract'],
+                (Arm.OUTPUT if context.data['output'] else Arm.INPUT).value,
+                context.parameters.path['stereotype_id'],
+                context.data['nonce'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def stereotype_remove_token(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.remove_token(
+                context.parameters.path['token_id'],
+                context.parameters.path['address'],
+                context.parameters.path['stereotype_id'],
+                context.parameters.query['nonce'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def stereotype_get_token(
+        request: Request,
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    from richmetas.contracts.starknet.composer import Arm, TokenSchema
+
+    with openapi_context(request) as context:
+        token = await richmetas.get_token(
+            context.parameters.path['stereotype_id'],
+            Arm[context.parameters.path['arm'][1:-1].upper()].value,
+            context.parameters.path['i'])
+
+        return web.json_response(TokenSchema().dump(token))
+
+
+@operations.register
+@inject
+async def activate_stereotype(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.activate_stereotype(
+                context.parameters.path['id'],
+                context.parameters.query['nonce'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def stereotype_install_token(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.install_token(
+                context.data['user'],
+                context.data['token_id'],
+                context.data['contract'],
+                context.parameters.path['stereotype_id'],
+                context.data['nonce'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def stereotype_uninstall_token(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.uninstall_token(
+                context.parameters.path['token_id'],
+                context.parameters.path['address'],
+                context.parameters.path['stereotype_id'],
+                context.parameters.query['nonce'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def stereotype_get_install(
+        request: Request,
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    from richmetas.contracts.starknet.composer import InstallSchema
+
+    with openapi_context(request) as context:
+        install = await richmetas.get_install(
+            context.parameters.path['token_id'],
+            context.parameters.path['address'])
+        if install is None:
+            return web.HTTPNotFound()
+
+        return web.json_response(InstallSchema().dump(install))
+
+
+@operations.register
+@inject
+async def execute_stereotype(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.execute_stereotype(
+                context.parameters.path['id'],
+                context.parameters.query['nonce'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def launch_stereotype(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.launch_stereotype(
+                context.data['id'],
+                context.data['admin'],
+                context.data['user'],
+                context.data['inputs'],
+                context.data['outputs'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
+async def solve_stereotype(
+        request: Request,
+        gateway: GatewayClient = Provide[Container.gateway],
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    with openapi_context(request) as context:
+        tx = await gateway.add_transaction(
+            richmetas.execute_stereotype(
+                context.parameters.path['id'],
+                context.parameters.query['nonce'],
+                context.parameters.query['signature']))
+
+        return web.json_response(tx)
+
+
+@operations.register
+@inject
 async def get_tx_status(
         request: Request,
         feeder_gateway: FeederGatewayClient = Provide[Container.feeder_gateway]):

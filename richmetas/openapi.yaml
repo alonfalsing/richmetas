@@ -176,6 +176,24 @@ components:
           type: string
       required: [name, description, image]
 
+    TokenID:
+      type: object
+      properties:
+        token_id:
+          type: string
+        contract:
+          type: string
+      required: [token_id, contract]
+
+    Install:
+      type: object
+      properties:
+        stereotype_id:
+          type: string
+        owner:
+          type: string
+      required: [stereotype_id, owner]
+
     Token:
       allOf:
         - $ref: '#/components/schemas/Metadata'
@@ -1274,6 +1292,458 @@ paths:
           required: true
           schema:
             type: string
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes:
+    post:
+      operationId: create_stereotype
+      summary: Create stereotype
+      tags: [stereotype]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                admin:
+                  type: string
+                user:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/{id}:
+    get:
+      operationId: get_stereotype
+      summary: Get stereotype
+      tags: [stereotype]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inputs:
+                    type: integer
+                  outputs:
+                    type: integer
+                  installs:
+                    type: integer
+                  admin:
+                    type: string
+                  user:
+                    type: string
+                  state:
+                    type: string
+                    enum: [NEW, OPEN, READY, CLOSED]
+        '404':
+          description: The stereotype is not found.
+
+  /stereotypes/{stereotype_id}/_tokens:
+    post:
+      operationId: stereotype_add_token
+      summary: Add input / output token to (new) stereotype
+      tags: [stereotype]
+      parameters:
+        - name: stereotype_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([token_id, contract, 2 if output else 1, stereotype_id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token_id:
+                  type: string
+                contract:
+                  type: string
+                output:
+                  type: boolean
+                nonce:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/{stereotype_id}/_tokens/{token_id}/collections/{address}:
+    delete:
+      operationId: stereotype_remove_token
+      summary: Remove input / output token from (new) stereotype
+      tags: [stereotype]
+      parameters:
+        - name: stereotype_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([token_id, contract, stereotype_id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/{stereotype_id}/{arm}/{i}:
+    get:
+      operationId: stereotype_get_token
+      summary: Find input / output / install token by index
+      tags: [stereotype]
+      parameters:
+        - name: stereotype_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: arm
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [_inputs, _outputs, _installs]
+        - name: i
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenID'
+
+  /stereotypes/{id}/_activate:
+    post:
+      operationId: activate_stereotype
+      summary: Activate stereotype
+      tags: [stereotype]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/{stereotype_id}/_installs:
+    post:
+      operationId: stereotype_install_token
+      summary: Install token to (open) stereotype
+      tags: [stereotype]
+      parameters:
+        - name: stereotype_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([token_id, contract, stereotype_id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: string
+                token_id:
+                  type: string
+                contract:
+                  type: string
+                nonce:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/{stereotype_id}/_installs/{token_id}/collections/{address}:
+    delete:
+      operationId: stereotype_uninstall_token
+      summary: Uninstall token from (open) stereotype
+      tags: [stereotype]
+      parameters:
+        - name: stereotype_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([token_id, contract, stereotype_id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/_installs/{token_id}/collections/{address}:
+    get:
+      operationId: stereotype_get_install
+      summary: Find install by token
+      tags: [stereotype]
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Install'
+        '404':
+          description: The token is not installed.
+
+  /stereotypes/{id}/_execute:
+    post:
+      operationId: execute_stereotype
+      summary: Execute (ready) stereotype
+      tags: [stereotype]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/_launch:
+    post:
+      operationId: launch_stereotype
+      summary: Launch stereotype
+      tags: [stereotype]
+      parameters:
+        - name: signature
+          in: query
+          required: true
+          description: |
+            `sign([id, nonce])`
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          explode: false
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                inputs:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TokenID'
+                outputs:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TokenID'
+                admin:
+                  type: string
+                user:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tx'
+
+  /stereotypes/{id}/_solve:
+    post:
+      operationId: solve_stereotype
+      summary: Solve (ready) stereotype
+      tags: [stereotype]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: integer
         - name: signature
           in: query
           required: true
