@@ -84,6 +84,7 @@ class Container(containers.DeclarativeContainer):
         stark_key)
     ledger_contract = providers.Factory(BaseContract, config.ledger_address)
     exchange_contract = providers.Factory(BaseContract, config.exchange_address)
+    composer_contract = providers.Factory(BaseContract, config.composer_address)
     legacy_ledger = providers.Factory(
         BaseFeeder,
         config.legacy_ledger_address,

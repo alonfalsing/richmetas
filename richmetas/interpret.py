@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 import aiohttp
 import click
 from dependency_injector.wiring import Provide, inject
-from sqlalchemy import select, update
+from sqlalchemy import select, update, desc, null
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,6 +17,8 @@ from web3 import Web3
 from richmetas.containers import Container, build_container
 from richmetas.contracts import ERC20, ERC721Metadata
 from richmetas.contracts.starknet import Facade as StarkRichmetas
+from richmetas.contracts.starknet.base import Base as BaseContract
+from richmetas.contracts.starknet.composer import Arm
 from richmetas.globals import async_session, feeder_gateway_client
 from richmetas.models import Account, TokenContract, Token, LimitOrder, Block, StarkContract, Blueprint, Transfer, \
     TokenFlow, FlowType, Withdrawal, Deposit
@@ -37,6 +39,7 @@ class RichmetasInterpreter:
             ledger_address: int = Provide[Container.config.ledger_address],
             ledger_facade_address: int = Provide[Container.config.ledger_facade_address],
             exchange_facade_address: int = Provide[Container.config.exchange_facade_address],
+            composer_facade_address: int = Provide[Container.config.composer_facade_address],
             login_facade_admin_address: int = Provide[Container.config.login_facade_admin_address]):
         from starkware.starknet.public.abi import get_selector_from_name
 
@@ -56,6 +59,10 @@ class RichmetasInterpreter:
                 (exchange_facade_address, 'create_order'),
                 (exchange_facade_address, 'fulfill_order'),
                 (exchange_facade_address, 'cancel_order'),
+                (composer_facade_address, 'install_token'),
+                (composer_facade_address, 'uninstall_token'),
+                (composer_facade_address, 'execute_stereotype'),
+                (composer_facade_address, 'solve_stereotype'),
             ]
         ])
 
@@ -101,17 +108,7 @@ class RichmetasInterpreter:
     async def mint(self, tx: Transaction):
         logging.warning(f'mint')
         user, token_id, contract, _nonce = tx.calldata
-        token = await self.lift_token(token_id, contract)
-        token.latest_tx = tx
-
-        token.owner = await self.lift_account(user)
-        flow = TokenFlow(
-            transaction=tx,
-            type=FlowType.MINT.value,
-            token=token,
-            to_account=token.owner,
-        )
-        self.session.add(flow)
+        await self._mint(user, token_id, contract, tx)
 
     async def withdraw(self, tx: Transaction):
         logging.warning(f'withdraw')
@@ -184,24 +181,7 @@ class RichmetasInterpreter:
     async def transfer(self, tx: Transaction):
         logging.warning(f'transfer')
         from_address, to_address, amount_or_token_id, contract, nonce = tx.calldata
-        token = await self.lift_token(amount_or_token_id, contract)
-        if token:
-            from_account = await self.lift_account(from_address)
-            to_account = await self.lift_account(to_address)
-
-            assert token.owner == from_account
-            token.owner = to_account
-            token.latest_tx = tx
-
-            flow = TokenFlow(
-                transaction=tx,
-                type=FlowType.TRANSFER.value,
-                token=token,
-                from_account=from_account,
-                to_account=to_account,
-            )
-            self.session.add(flow)
-        else:
+        if (await self._flow(from_address, to_address, amount_or_token_id, contract, tx)) is None:
             status = tx.block._document['status']
             try:
                 transfer = (await self.session.execute(
@@ -289,6 +269,93 @@ class RichmetasInterpreter:
         else:
             limit_order.token.ask = None
 
+    @inject
+    async def install_token(
+            self,
+            tx: Transaction,
+            composer: BaseContract = Provide[Container.composer_contract]):
+        logging.warning(f'install_token')
+        user, token_id, contract, stereotype_id, _nonce = tx.calldata
+        await self._flow(user, composer.address, token_id, contract, tx, extra=dict(
+            stereotype_id=stereotype_id,
+            owner=user,
+            _f='install_token',
+        ))
+
+    async def uninstall_token(self, tx: Transaction):
+        logging.warning(f'uninstall_token')
+        token_id, contract, stereotype_id, _nonce = tx.calldata
+        flow = (await self.session.execute(
+            select(TokenFlow).
+            join(TokenFlow.token).
+            join(Token.contract).
+            join(TokenFlow.transaction).
+            where(Token.token_id == Decimal(parse_int(token_id))).
+            where(TokenContract.address == to_checksum_address(contract)).
+            order_by(desc(Transaction.block_number)).
+            order_by(desc(Transaction.transaction_index)).
+            limit(1))).scalar_one()
+        assert flow.extra['_f'] == 'install_token'
+        await self._flow(self._composer.address, flow.extra['owner'], token_id, contract, tx, extra=dict(
+            stereotype_id=stereotype_id,
+            _f='uninstall_token',
+        ))
+
+    @inject
+    async def execute_stereotype(
+            self,
+            tx: Transaction,
+            richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+        logging.warning(f'execute_stereotype')
+        stereotype_id, _nonce = tx.calldata
+        stereotype = await richmetas.get_stereotype(stereotype_id)
+        for i in range(stereotype.outputs):
+            token = await richmetas.get_token(stereotype_id, Arm.OUTPUT.value, i)
+            await self._mint(stereotype.user, token.token_id, token.contract, tx, extra=dict(
+                stereotype_id=stereotype_id,
+                _f='execute_stereotype',
+            ))
+
+    async def solve_stereotype(self, tx: Transaction):
+        logging.warning(f'solve_stereotype')
+        raise NotImplementedError()
+
+    async def _mint(self, to_address, token_id, contract, tx: Transaction, extra=None):
+        token = await self.lift_token(token_id, contract)
+        token.latest_tx = tx
+
+        token.owner = await self.lift_account(to_address)
+        flow = TokenFlow(
+            transaction=tx,
+            type=FlowType.MINT.value,
+            token=token,
+            to_account=token.owner,
+            extra=extra or null(),
+        )
+        self.session.add(flow)
+
+    async def _flow(self, from_address, to_address, token_id, contract, tx: Transaction, extra=None):
+        token = await self.lift_token(token_id, contract)
+        if token:
+            from_account = await self.lift_account(from_address)
+            to_account = await self.lift_account(to_address)
+
+            assert token.owner == from_account
+            token.owner = to_account
+            token.latest_tx = tx
+
+            flow = TokenFlow(
+                transaction=tx,
+                type=FlowType.TRANSFER.value,
+                token=token,
+                from_account=from_account,
+                to_account=to_account,
+                extra=extra or null(),
+            )
+            self.session.add(flow)
+
+        return token
+
     async def lift_account(self, user: str, address: Optional[str] = None) -> Account:
         user = Decimal(user)
 
@@ -355,10 +422,10 @@ class RichmetasInterpreter:
 
 @inject
 async def interpret(
-        richmetas: StarkRichmetas = Provide[Container.stark_richmetas],
         ledger_address: int = Provide[Container.config.ledger_address],
         ledger_facade_address: int = Provide[Container.config.ledger_facade_address],
         exchange_facade_address: int = Provide[Container.config.exchange_facade_address],
+        composer_facade_address: int = Provide[Container.config.composer_facade_address],
         login_facade_admin_address: int = Provide[Container.config.login_facade_admin_address]):
     async with async_session() as session:
         try:
@@ -377,23 +444,26 @@ async def interpret(
         ledger_address,
         ledger_facade_address,
         exchange_facade_address,
+        composer_facade_address,
         login_facade_admin_address])]
     while True:
         async with async_session() as session:
-            block_counter, n = (await session.execute(
+            block_counters = (await session.execute(
                 select(
+                    StarkContract.address,
                     functions.coalesce(
-                        functions.max(StarkContract.block_counter),
-                        functions.min(Transaction.block_number)),
-                    functions.count()).
-                join(Transaction.contract).
+                        StarkContract.block_counter,
+                        Transaction.block_number)).
+                select_from(StarkContract).
+                join(StarkContract.transactions).
                 where(Transaction.type == TYPE_DEPLOY).
-                where(StarkContract.address.in_(addresses)))).one()
-            if n < len(addresses):
+                where(StarkContract.address.in_(addresses)))).all()
+            if len(block_counters) < len(addresses):
                 logging.warning('Failed to find "DEPLOY"')
                 await asyncio.sleep(15)
                 continue
 
+            block_counter = min([b for _a, b in block_counters])
             try:
                 block, = (await session.execute(
                     select(Block).where(Block.id == block_counter))).one()
@@ -402,13 +472,14 @@ async def interpret(
                 await asyncio.sleep(15)
                 continue
 
+            active_addresses = [a for a, b in block_counters if b == block_counter]
             async with aiohttp.ClientSession() as client:
                 interpreter = RichmetasInterpreter(session, client, Web3())
                 for tx, in await session.execute(
                         select(Transaction).
                         join(Transaction.contract).
                         where(Transaction.block == block).
-                        where(StarkContract.address.in_(addresses)).
+                        where(StarkContract.address.in_(active_addresses)).
                         order_by(Transaction.transaction_index).
                         options(selectinload(Transaction.contract))):
                     logging.warning(f'interpret(tx={tx.hash})')
@@ -416,34 +487,41 @@ async def interpret(
 
             await session.execute(
                 update(StarkContract).
-                where(StarkContract.address.in_(addresses)).
+                where(StarkContract.address.in_(active_addresses)).
                 values(block_counter=block_counter + 1))
-            for transfer in (await session.execute(
-                    select(Transfer).
-                    where(Transfer.status.in_([Status.NOT_RECEIVED.value, Status.RECEIVED.value])).
-                    limit(20).
-                    options(
-                        selectinload(Transfer.from_account),
-                        selectinload(Transfer.to_account),
-                        selectinload(Transfer.contract)))).scalars():
-                status = (await feeder_gateway_client.get_transaction_status(tx_hash=transfer.hash))['tx_status']
-                if status == Status.NOT_RECEIVED.value:
-                    logging.warning(f'transfer(hash={transfer.hash})')
-                    await richmetas.transfer(
-                        int(transfer.from_account.stark_key),
-                        int(transfer.to_account.stark_key),
-                        int(transfer.amount),
-                        transfer.contract.address,
-                        int(transfer.nonce),
-                        [int(transfer.signature_r), int(transfer.signature_s)])
-                elif status == Status.REJECTED.value:
-                    logging.warning(f'reject(hash={transfer.hash})')
-                    await TransferService(session).reject(transfer)
-                else:
-                    logging.warning(f'update(hash={transfer.hash}, status={status})')
-                    transfer.status = status
 
+            await flush_transfers(session)
             await session.commit()
+
+
+@inject
+async def flush_transfers(
+        session: AsyncSession,
+        richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
+    for transfer in (await session.execute(
+            select(Transfer).
+            where(Transfer.status.in_([Status.NOT_RECEIVED.value, Status.RECEIVED.value])).
+            limit(20).
+            options(
+            selectinload(Transfer.from_account),
+            selectinload(Transfer.to_account),
+            selectinload(Transfer.contract)))).scalars():
+        status = (await feeder_gateway_client.get_transaction_status(tx_hash=transfer.hash))['tx_status']
+        if status == Status.NOT_RECEIVED.value:
+            logging.warning(f'transfer(hash={transfer.hash})')
+            await richmetas.transfer(
+                int(transfer.from_account.stark_key),
+                int(transfer.to_account.stark_key),
+                int(transfer.amount),
+                transfer.contract.address,
+                int(transfer.nonce),
+                [int(transfer.signature_r), int(transfer.signature_s)])
+        elif status == Status.REJECTED.value:
+            logging.warning(f'reject(hash={transfer.hash})')
+            await TransferService(session).reject(transfer)
+        else:
+            logging.warning(f'update(hash={transfer.hash}, status={status})')
+            transfer.status = status
 
 
 @click.command()

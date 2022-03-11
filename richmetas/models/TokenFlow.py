@@ -1,7 +1,7 @@
 from enum import Enum
 
 from marshmallow import Schema, fields
-from sqlalchemy import Column, Integer, Numeric, Boolean, String, ForeignKey
+from sqlalchemy import Column, Integer, Numeric, Boolean, String, ForeignKey, JSON
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 from web3 import Web3
@@ -32,6 +32,7 @@ class TokenFlow(Base):
     _address = Column(String)
     mint = Column(Boolean)
     nonce = Column(Numeric(precision=80))
+    extra = Column(JSON)
     event_id = Column(Integer, ForeignKey('eth_event.id'), unique=True)
 
     @hybrid_property
