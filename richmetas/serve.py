@@ -878,19 +878,15 @@ async def inspect_tx(request: Request):
 
 async def upload(request: Request):
     import hashlib
-    import mimetypes
-    import aiohttp.hdrs
+    import pathlib
 
     reader = await request.multipart()
     part = await reader.next()
     if part.name != 'asset':
         return web.HTTPBadRequest()
 
-    extension = mimetypes.guess_extension(part.headers[aiohttp.hdrs.CONTENT_TYPE])
-    if not extension:
-        return web.HTTPBadRequest()
-
     data = await part.read()
+    extension = pathlib.PurePath(part.filename).suffix
     asset = f'{hashlib.sha1(data).hexdigest()}{extension}'
     file = request.config_dict['bucket_root'] / asset[:2] / asset[2:4] / asset
     file.parent.mkdir(parents=True, exist_ok=True)
