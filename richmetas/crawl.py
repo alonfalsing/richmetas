@@ -136,8 +136,7 @@ class Crawler:
                     type=transaction['type'],
                     contract=contract,
                     entry_point_selector=transaction.get('entry_point_selector'),
-                    entry_point_type=transaction.get('entry_point_type'),
-                    calldata=transaction['calldata' if transaction['type'] != 'DEPLOY' else 'constructor_calldata'])
+                    entry_point_type=transaction.get('entry_point_type'))
                 session.add(tx)
 
             await session.commit()

@@ -1,6 +1,6 @@
 from marshmallow import Schema, fields
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from .Base import Base
@@ -12,7 +12,7 @@ class Block(Base):
     id = Column(Integer, primary_key=True, autoincrement=False)
     hash = Column(String, unique=True, nullable=False)
     timestamp = Column(DateTime(timezone=True), nullable=False)
-    _document = Column(JSON, nullable=False)
+    _document = Column(JSONB, nullable=False)
 
     transactions = relationship('Transaction', back_populates='block')
 

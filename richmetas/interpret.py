@@ -274,17 +274,27 @@ class RichmetasInterpreter:
             self,
             tx: Transaction,
             composer: BaseContract = Provide[Container.composer_contract]):
-        logging.warning(f'install_token')
         user, token_id, contract, stereotype_id, _nonce = tx.calldata
+        if (await self._solve_stereotype('install_token', stereotype_id, tx)) > 0:
+            return
+
+        logging.warning(f'install_token')
         await self._flow(user, composer.address, token_id, contract, tx, extra=dict(
             stereotype_id=stereotype_id,
             owner=user,
             _f='install_token',
         ))
 
-    async def uninstall_token(self, tx: Transaction):
-        logging.warning(f'uninstall_token')
+    @inject
+    async def uninstall_token(
+            self,
+            tx: Transaction,
+            composer: BaseContract = Provide[Container.composer_contract]):
         token_id, contract, stereotype_id, _nonce = tx.calldata
+        if (await self._solve_stereotype('uninstall_token', stereotype_id, tx)) > 0:
+            return
+
+        logging.warning(f'uninstall_token')
         flow = (await self.session.execute(
             select(TokenFlow).
             join(TokenFlow.token).
@@ -296,7 +306,7 @@ class RichmetasInterpreter:
             order_by(desc(Transaction.transaction_index)).
             limit(1))).scalar_one()
         assert flow.extra['_f'] == 'install_token'
-        await self._flow(self._composer.address, flow.extra['owner'], token_id, contract, tx, extra=dict(
+        await self._flow(composer.address, flow.extra['owner'], token_id, contract, tx, extra=dict(
             stereotype_id=stereotype_id,
             _f='uninstall_token',
         ))
@@ -306,8 +316,11 @@ class RichmetasInterpreter:
             self,
             tx: Transaction,
             richmetas: StarkRichmetas = Provide[Container.stark_richmetas]):
-        logging.warning(f'execute_stereotype')
         stereotype_id, _nonce = tx.calldata
+        if (await self._solve_stereotype('execute_stereotype', stereotype_id, tx)) > 0:
+            return
+
+        logging.warning(f'execute_stereotype')
         stereotype = await richmetas.get_stereotype(stereotype_id)
         for i in range(stereotype.outputs):
             token = await richmetas.get_token(stereotype_id, Arm.OUTPUT.value, i)
@@ -317,8 +330,41 @@ class RichmetasInterpreter:
             ))
 
     async def solve_stereotype(self, tx: Transaction):
-        logging.warning(f'solve_stereotype')
-        raise NotImplementedError()
+        await self._solve_stereotype('solve_stereotype', tx.calldata[0], tx)
+
+    @inject
+    async def _solve_stereotype(
+            self,
+            f,
+            stereotype_id,
+            tx: Transaction,
+            ledger_contract: BaseContract = Provide[Container.ledger_contract]):
+        from starkware.starknet.public.abi import get_selector_from_name
+
+        n = 0
+        for event in tx.events:
+            if parse_int(event['from_address']) != ledger_contract.address:
+                continue
+
+            n += 1
+            selector = parse_int(event['keys'][0])
+            if selector == get_selector_from_name('transfer_event'):
+                logging.warning(f'{f}.transfer')
+                from_address, to_address, amount_or_token_id, contract = event['data']
+                await self._flow(from_address, to_address, amount_or_token_id, contract, tx, extra=dict(
+                    stereotype_id=stereotype_id,
+                    owner=from_address,
+                    _f=f,
+                ))
+            if selector == get_selector_from_name('mint_event'):
+                logging.warning(f'{f}.mint')
+                user, token, contract = event['data']
+                await self._mint(user, token, contract, tx, extra=dict(
+                    stereotype_id=stereotype_id,
+                    _f=f,
+                ))
+
+        return n
 
     async def _mint(self, to_address, token_id, contract, tx: Transaction, extra=None):
         token = await self.lift_token(token_id, contract)
@@ -393,13 +439,17 @@ class RichmetasInterpreter:
 
         token.token_uri = urljoin(token_contract.base_uri, str(token_id)) if token_contract.base_uri else \
             ERC721Metadata(token_contract.address, self.w3).token_uri(int(token_id))
-        async with self.client.get(token.token_uri) as resp:
-            token.asset_metadata = await resp.json()
+        from aiohttp import ClientError
+        try:
+            async with self.client.get(token.token_uri) as resp:
+                token.asset_metadata = await resp.json()
 
-            ERC721Metadata.validate(token.asset_metadata)
-            token.name = token.asset_metadata['name']
-            token.description = token.asset_metadata['description']
-            token.image = token.asset_metadata['image']
+                ERC721Metadata.validate(token.asset_metadata)
+                token.name = token.asset_metadata['name']
+                token.description = token.asset_metadata['description']
+                token.image = token.asset_metadata['image']
+        except ClientError as e:
+            logging.warning(e)
 
         return token
 

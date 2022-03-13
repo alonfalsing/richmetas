@@ -19,13 +19,26 @@ class Transaction(Base):
     contract_id = Column(Integer, ForeignKey('stark_contract.id'), nullable=False)
     entry_point_selector = Column(String)
     entry_point_type = Column(String)
-    calldata = Column(JSON, nullable=False)
 
     block = relationship('Block', back_populates='transactions')
     contract = relationship('StarkContract', back_populates='transactions')
     deposit = relationship('Deposit', back_populates='transaction', uselist=False)
     withdrawal = relationship('Withdrawal', back_populates='transaction', uselist=False)
     token_flow = relationship('TokenFlow', back_populates='transaction', uselist=False)
+
+    @property
+    def calldata(self):
+        tx = self.block._document['transactions'][self.transaction_index]
+        assert tx['transaction_hash'] == self.hash
+
+        return tx['calldata' if self.type != 'DEPLOY' else 'constructor_calldata']
+
+    @property
+    def events(self):
+        r = self.block._document['transaction_receipts'][self.transaction_index]
+        assert r['transaction_hash'] == self.hash
+
+        return r['events']
 
 
 class TransactionSchema(Schema):
