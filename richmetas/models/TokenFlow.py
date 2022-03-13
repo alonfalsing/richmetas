@@ -24,7 +24,7 @@ class TokenFlow(Base):
     __tablename__ = 'token_flow'
 
     id = Column(Integer, primary_key=True)
-    transaction_id = Column(Integer, ForeignKey('transaction.id'), unique=True, nullable=False)
+    transaction_id = Column(Integer, ForeignKey('transaction.id'), nullable=False)
     type = Column(String, nullable=False)
     token_id = Column(Integer, ForeignKey('token.id'), nullable=False)
     from_account_id = Column(Integer, ForeignKey('account.id'))
