@@ -2,6 +2,7 @@ from marshmallow import Schema, fields
 from sqlalchemy import Column, Integer, String, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 
+from richmetas.utils import parse_int
 from .Base import Base
 from .Block import BlockSchema
 
@@ -26,6 +27,10 @@ class Transaction(Base):
     deposit = relationship('Deposit', back_populates='transaction', uselist=False)
     withdrawal = relationship('Withdrawal', back_populates='transaction', uselist=False)
     token_flow = relationship('TokenFlow', back_populates='transaction', uselist=False)
+
+    @property
+    def params(self):
+        return [*map(parse_int, self.calldata)]
 
 
 class TransactionSchema(Schema):

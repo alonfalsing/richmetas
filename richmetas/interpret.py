@@ -55,7 +55,7 @@ class RichmetasInterpreter:
 
     async def register_contract(self, tx: Transaction):
         logging.warning(f'register_contract')
-        _from_address, contract, kind, mint = tx.calldata
+        _from_address, contract, kind, mint = tx.params
         address = to_checksum_address(contract)
         try:
             token_contract = (await self.session.execute(
@@ -82,12 +82,12 @@ class RichmetasInterpreter:
 
     async def register_client(self, tx: Transaction):
         logging.warning(f'register_client')
-        user, address, _nonce = tx.calldata
+        user, address, _nonce = tx.params
         await self.lift_account(user, address)
 
     async def mint(self, tx: Transaction):
         logging.warning(f'mint')
-        user, token_id, contract, _nonce = tx.calldata
+        user, token_id, contract, _nonce = tx.params
         token = await self.lift_token(token_id, contract)
         token.latest_tx = tx
 
@@ -102,7 +102,7 @@ class RichmetasInterpreter:
 
     async def withdraw(self, tx: Transaction):
         logging.warning(f'withdraw')
-        user, amount_or_token_id, contract, address, nonce = tx.calldata
+        user, amount_or_token_id, contract, address, nonce = tx.params
         account = await self._transfer_service.lift_account(parse_int(user))
         token = await self.lift_token(amount_or_token_id, contract)
         if token:
@@ -141,7 +141,7 @@ class RichmetasInterpreter:
 
     async def deposit(self, tx: Transaction):
         logging.warning(f'deposit')
-        _from_address, user, amount_or_token_id, contract, _nonce = tx.calldata
+        _from_address, user, amount_or_token_id, contract, _nonce = tx.params
         account = await self.lift_account(user)
         token = await self.lift_token(amount_or_token_id, contract)
         if token:
@@ -170,7 +170,7 @@ class RichmetasInterpreter:
 
     async def transfer(self, tx: Transaction):
         logging.warning(f'transfer')
-        from_address, to_address, amount_or_token_id, contract, nonce = tx.calldata
+        from_address, to_address, amount_or_token_id, contract, nonce = tx.params
         token = await self.lift_token(amount_or_token_id, contract)
         if token:
             from_account = await self.lift_account(from_address)
@@ -209,7 +209,7 @@ class RichmetasInterpreter:
 
     async def create_order(self, tx: Transaction):
         logging.warning(f'create_order')
-        order_id, user, bid, base_contract, base_token_id, quote_contract, quote_amount = tx.calldata
+        order_id, user, bid, base_contract, base_token_id, quote_contract, quote_amount = tx.params
         account = await self.lift_account(user)
         token = await self.lift_token(base_token_id, base_contract)
         quote_contract, = (await self.session.execute(
@@ -234,7 +234,7 @@ class RichmetasInterpreter:
 
     async def fulfill_order(self, tx: Transaction):
         logging.warning(f'fulfill_order')
-        order_id, user, _nonce = tx.calldata
+        order_id, user, _nonce = tx.params
         limit_order, = (await self.session.execute(
             select(LimitOrder).
             where(LimitOrder.order_id == Decimal(order_id)).
@@ -263,7 +263,7 @@ class RichmetasInterpreter:
 
     async def cancel_order(self, tx: Transaction):
         logging.warning(f'cancel_order')
-        order_id, nonce_ = tx.calldata
+        order_id, nonce_ = tx.params
         limit_order, = (await self.session.execute(
             select(LimitOrder).
             where(LimitOrder.order_id == Decimal(order_id)).
